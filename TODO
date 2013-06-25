@@ -1,0 +1,162 @@
+1) Controle do tamanho dos pacotes---------------------------------------------------------------OK
+	- Por parâmetro de entrada, limitada em valores mínimo (40). e máximo(1496).
+		- Configuração no transmissor
+		- Buffer do transmissor segundo parâmetro de entrada
+		- Buffer do receptor no valor máximo
+2) Controle do tamanho da rajada-----------------------------------------------------------------OK
+	- Por parâmetro de entrada, limitado em valores mínimo(2) e máximo(500).
+		- Configuração no transmissor
+3) Controle do número de rajadas sequenciais-----------------------------------------------------OK
+	- Por parâmetro de entrada, limitada em valores mínimo(1) e máximo(10)
+		- Configuração no transmissor
+		- Implementação
+			- Necessário header no pacote, identificando a a rajada (adicionalmente pode ser identificado o número do pacote na rajada para enventuais cálculo de perdas)
+			- Identificação da rajada no receptor.
+	
+4) Resultado automatizado no receiver------------------------------------------------------------OK
+	- Mensagem de fim de teste no transmissor.
+
+5) Scripts para testes---------------------------------------------------------------------------OK
+
+6) Controle do buffer para sockets---------------------------------------------------------------OK
+	- Por parâmetro de entrada
+		- Configuração no transmissor e no receptor
+			- Testes com tamanhos idênticos de buffer???????????
+			- Testes com diferentes tamanhos de buffer para receptor e transmissor???????????
+
+7) Testes Bidirecionais
+	- Excluir entidades transmissor e receptor
+	- Apenas um executável rodando de ambas as formas.
+		- Quando transmissor, inicia os testes;
+		- Quando receptor apenas responde aos probes de teste.
+	- Parâmetros do probe nos pacotes
+		- Tamanho dos pacotes;
+		- Número de pacotes por trem;
+		- Número de trens;
+		- Intervalo entre os trens.
+	- Parâmetros externos
+		- Ip do host receptor;
+		- Porta;
+		- Tamanho do socket buffer.
+
+8)
+
+
+
+Estrutura
+	Tester
+	s	Sender
+			Trem de pacotes
+				Parametros: socket_buffer_size, host_addr, packet_size, train_size, train_num, train_interval, rate
+			Continuo
+				Parametros: socket_buffer_size, host_addr, packet_size, test_time, rate
+	c	Receiver
+			Trem de pacotes
+				Parametros: socket_buffer_size
+			Continuo
+				Parametros: socket_buffer_size
+
+
+Param
+	mode_type			-- sender, receiver
+	test_type			-- trem, continuo, ambos???
+	socket_rcv			-- valores diferentes para rcv/send???
+	socket_send
+	host_addr			-- modo sender, modo receiver receberá host_addr no teste
+	packet_size			-- modo sender, modo receiver receberá packet_size no teste
+	train_size			-- modo sender, modo receiver receberá train_size no teste (teste com trem de pacotes)
+	train_num			-- modo sender, modo receiver receberá train_num no teste (teste com trem de pacotes)
+	train_interval		-- modo sender, modo receiver receberá train_interval no teste (teste com trem de pacotes)
+	rate				-- modo sender, modo receiver receberá rate no teste
+	test_time			-- modo sender, modo receiver receberá rate no teste
+
+Packet
+	PACKET_TYPE			--	TRAIN_TEST, CONTINUO_TEST, END_TEST, CTRL (inicio de teste de trem, inicio de teste continuo, 
+	PROBE_ID
+	TRAIN_ID
+	PACKET_ID
+	TRAIN_SIZE
+	TRAIN_MAX
+	PACKET_SIZE
+	HOST_ADDR(IPv4)
+	TRAIN_INTERVAL
+	RATE
+	INT_TEST
+	
+
+Modo Sender
+	Conexão de controle (recebe e envia, dois sockets?)
+		-- sinaliza inicio de teste
+			-- espera resposta (timeout??)
+			-- inicia teste (thread)
+			-- recebe feedback do receiver
+				-- resultados satisfatórios??
+			-- recebe sinalização de teste de upload
+	Conexão de dados
+		-- teste sender
+			-- trem de pacotes
+			-- continuo
+		-- teste receive
+			-- trem de pacotes
+			-- continuo
+			-- fim de teste
+				-- analisa resultados
+				-- informa ao sender os resultados (taxa, erros/perdas) através da conexão de controle
+
+Modo Receiver
+	Conexão de controle (recebe e envia, dois sockets?)
+		-- espera sinal de teste
+			-- responde ao sender
+			-- prepara recv de teste (thread)
+	Conexão de dados
+		-- teste sender
+			-- trem de pacotes
+			-- continuo
+		-- teste receive
+			-- trem de pacotes
+			-- continuo
+			-- fim de teste
+				-- analisa resultados
+				-- informa ao sender os resultados (taxa, erros/perdas) através da conexão de controle
+
+
+-----
+Modo sender
+init:
+		identifica_teste
+		cria_pacote
+		envia_pacote
+		espera_resposta
+		inicia_teste
+			fim_de_teste
+		espera_resultados
+			calcula_proximo_teste
+		espera_teste_upload
+			inicia_recv_teste
+			fim_teste
+			envia_resultados
+		espera intervalo_proximo_teste
+		goto init
+
+-----
+Modo receiver
+init:
+		espera_msg_inicio_teste
+			inicia_recv_teste
+			fim_teste
+			envia_resultados
+		identifica_teste
+		cria_pacote
+		envia_pacote
+		espera_resposta
+		inicia_teste
+			fim_de_teste
+		espera_resultados
+			calcula_proximo_teste
+		goto init	
+
+
+    Teste de commit, alterado arquivo de teste Hello World. Agora temos um duplo
+Hello World!
+
+    Alterado arquivo de teste em novo branch. Agora temos um triplo Hello World!
