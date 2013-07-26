@@ -7,7 +7,8 @@ RM=rm
 MFLAGS= -s
 
 DIR_MAIN = $(BASEDIR)/source
-DIR_LIST= $(DIR_MAIN) 
+DIR_TOOLS = $(DIR_MAIN)/tools
+DIR_LIST= $(DIR_MAIN) $(DIR_TOOLS)
 	
 CFLAGS:=-Wall -Werror \
 	-I$(DIR_INCLUDE)
@@ -15,8 +16,9 @@ CFLAGS:=-Wall -Werror \
 #CFLAGS+= -DBBBBB
 	
 MAINOBJS=main.o
+TOOLSOBJS=parser.o
 
-COBJS=$(MAINOBJS)
+COBJS=$(MAINOBJS) $(TOOLSOBJS)
 
 LIBS:=
 	
