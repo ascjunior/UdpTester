@@ -302,6 +302,6 @@ typedef struct {
  */
 typedef struct {
 	char valid;							/**< Flag de validade da informação no pacote. >*/
-	ctrlpacket *pkt;					/**< Ponteiro para pacote de controle. >*/
+	ctrlpacket *data;					/**< Ponteiro para pacote de controle. >*/
 } ctrl_pkt;
 #endif /* __DEFINES_H__ */
