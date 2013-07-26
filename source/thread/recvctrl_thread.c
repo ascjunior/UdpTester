@@ -17,7 +17,7 @@ start_ctrl_connection(settings *conf_settings, sockets *sock) {
 void *recvctrl_thread (void *param) {
 	settings *conf_settings = (settings *)param;
 	ctrlpacket **queue = conf_settings->recv_queue;
-	ctrlpacket *pkt;
+	ctrlpacket *data;
 	struct sockaddr_in server;
 	struct sockaddr_in dest;
 	int socket_fd, client_fd,num;
@@ -66,13 +66,13 @@ void *recvctrl_thread (void *param) {
 
 		if (queue[conf_settings->recv_queue_id] == NULL) {
 			queue[conf_settings->recv_queue_id] = (ctrl_pkt *)malloc(sizeof(ctrl_pkt));
-			queue[conf_settings->recv_queue_id]->pkt = (ctrlpacket *)malloc(sizeof(ctrlpacket));
+			queue[conf_settings->recv_queue_id]->data = (ctrlpacket *)malloc(sizeof(ctrlpacket));
 		}
 		queue[conf_settings->recv_queue_id]->valid = 1;
-		pkt = queue[conf_settings->recv_queue_id]->pkt;
-		pkt->cp_type = RECEIVER_CONNECT;
-		pkt->packet_size = sizeof(ctrlpacket);
-		pkt->connected_address = dest.sin_addr;
+		data = queue[conf_settings->recv_queue_id]->data;
+		data->cp_type = RECEIVER_CONNECT;
+		data->packet_size = sizeof(ctrlpacket);
+		data->connected_address = dest.sin_addr;
 		
 		while (1) {
 			if ((num = recv (client_fd, buffer, MAXBUFFER_SIZE,0)) == -1) {
@@ -90,12 +90,12 @@ void *recvctrl_thread (void *param) {
 			conf_settings->recv_queue_id = (conf_settings->recv_queue_id + 1) % MAX_CTRL_QUEUE;
 			if (queue[conf_settings->recv_queue_id] == NULL) {
 				queue[conf_settings->recv_queue_id] = (ctrl_pkt *)malloc(sizeof(ctrl_pkt));
-				queue[conf_settings->recv_queue_id]->pkt = (ctrlpacket *)malloc(sizeof(ctrlpacket));
+				queue[conf_settings->recv_queue_id]->data = (ctrlpacket *)malloc(sizeof(ctrlpacket));
 			}
 			queue[conf_settings->recv_queue_id]->valid = 1;
-			pkt = queue[conf_settings->recv_queue_id]->pkt;
-			memcpy(pkt, buffer, num);
-			pkt->packet_size = num;
+			data = queue[conf_settings->recv_queue_id]->data;
+			memcpy(data, buffer, num);
+			data->packet_size = num;
 		}
 		close(client_fd);   
     }

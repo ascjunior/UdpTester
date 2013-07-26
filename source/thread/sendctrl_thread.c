@@ -18,8 +18,9 @@ start_ctrl_connection(settings *conf_settings, sockets *sock) {
 
 void *sendctrl_thread (void *param) {
 	settings *conf_settings = (settings *)param;
-	ctrlpacket **queue = conf_settings->recv_queue;
-	ctrlpacket *pkt;
+	ctrl_pkt **queue = conf_settings->send_queue;
+	ctrl_pkt *pkt;
+	ctrlpacket *data;
     struct sockaddr_in server_info;
     struct hostent *he;
     int socket_fd,num;
@@ -54,30 +55,32 @@ void *sendctrl_thread (void *param) {
 		conf_settings->send_queue_id = (conf_settings->send_queue_id + 1) % MAX_CTRL_QUEUE;
 		if (queue[conf_settings->send_queue_id] == NULL) {
 			queue[conf_settings->send_queue_id] = (ctrl_pkt *)malloc(sizeof(ctrl_pkt));
-			queue[conf_settings->send_queue_id]->pkt = (ctrlpacket *)malloc(sizeof(ctrlpacket));
+			queue[conf_settings->send_queue_id]->data = (ctrlpacket *)malloc(sizeof(ctrlpacket));
 		}
 		queue[conf_settings->send_queue_id]->valid = 1;
-		pkt = queue[conf_settings->send_queue_id]->pkt;
-		pkt->cp_type =SENDER_CONNECT;
-		pkt->packet_size = sizeof(ctrlpacket);
-		pkt->connected_address = dest.sin_addr;
+		data = queue[conf_settings->send_queue_id]->data;
+		data->cp_type =SENDER_CONNECT;
+		data->packet_size = sizeof(ctrlpacket);
+		data->connected_address = dest.sin_addr;
 	}
 
 	while (1) {
 
-		if ((queue[conf_settings->send_queue_id] != NULL) &&
-			(queue[conf_settings->send_queue_id]->valid == 1)) {
+		if (queue[conf_settings->send_queue_id] != NULL)) {
+			
+			pkt = queue[conf_settings->send_queue_id];
+			if ((pkt->valid) && (pkt->data != NULL)) {
+				data = queue[conf_settings->send_queue_id]->data;
+				if ((send (socket_fd, data, data->packet_size,0)) == -1) {
+					//LOG(LOG_ERROR, "Failure Sending Message\n");
+					continue;
+				}
 
-			pkt = queue[conf_settings->send_queue_id]->pkt;
-			if ((send (socket_fd, pkt, pkt->packet_size,0)) == -1) {
-				//LOG(LOG_ERROR, "Failure Sending Message\n");
-				continue;
+				queue[conf_settings->send_queue_id]->valid = 0;
+				conf_settings->send_queue_id--;
+				if (conf_settings->send_queue_id < 0)
+					conf_settings->send_queue_id = (MAX_CTRL_QUEUE - 1);
 			}
-
-			queue[conf_settings->send_queue_id]->valid = 0;
-			conf_settings->send_queue_id--;
-			if (conf_settings->send_queue_id < 0)
-				conf_settings->send_queue_id = MAX_CTRL_QUEUE;
 		}
 
 	} 
