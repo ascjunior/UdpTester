@@ -7,88 +7,81 @@
  
 #include <ctrl/ctrl.h>
 
- 
-void loop_control (settings *conf_settings) {
-	fila_send_msg
-		-- fila de mensagens de controle para send, verificada pela thread de controle que envia msg
-	fila_rcv_msg
-		-- fila populada pela thread de receive para mensagens de controle
+ctrlpacket *getnext_ctrlpacket (ctrl_pkt **ctrl_queue, short *index) {
+	ctrl_pkt *pkt = NULL;
+	ctrlpacket *data = NULL;
+	short i = *index;
 
-	struct_sockets???
-	socket_init()
-		-- estrutura com dados dos sockets de send/rcv para mensagens de controle (deve ser tcp!!) e inicialização
-
-
-	inicia_conexão_de_controle(conf_settings, struct_sockets)--send e receive???, uma ou duas threads de controle???
-			2 THREADs de CTRL:
-				- modo server: espera conexão de cliente
-					- recebe sinal de inicio de teste
-					- recebe log de teste
-				- modo cliente: busca conexão com servidor
-					- envia sinal de incio de teste
-					- envia log de teste
-			CALLBACKS para lista de msg??? -- NÃO: loop de controle
-					
-					Verifica lista de msg para envio
-			THREAD para RCV de controle!, mensagens recebidas adicionadas a uma fila de controle, thread independente (e as msgs duplicadas?)
-	if (conf_settings->mode == SENDER) {
-		while (1) {
-			loop_control_sender (conf_settings, )
-			----entra no modo receiver????
-			loop_control_receiver (conf_settings)
-			sleep(conf_settings->loop_test_interval)
+	/* TODO: semaforo para acesso as filas */
+	if (ctrl_queue[i] != NULL) {
+		pkt = ctrl_queue[i];
+		if ((pkt->valid) && (pkt->data != NULL)) {
+			data = pkt->pkt;
+			pkt->valid = 0;
+			i--;
+			if (i < 0)
+				i = (MAX_CTRL_QUEUE - 1);
 		}
 	}
-	else {
-		while (1) {
-			loop_control_receiver (conf_settings)
-			sleep(30s)
-			loop_control_sender (conf_settings)
-			sleep(30s)
+
+	return data;
+}
+
+void loop_control (settings *conf_settings) {
+	int ret = 0;
+	ctrlpacket *data;
+	ctrl_pkt **ctrl_queue = conf_settings->recv_queue;
+	short *index = conf_settings->recv_queue_id;
+	
+	data = getnext_ctrlpacket (ctrl_queue, index);
+	if (data != NULL) {
+		switch (data->cp_type) {
+			case:
+				break;
+			default:
+				break;
 		}
 	}
 }
 
-int start_ctrl_connection (settings *conf_settings) {
+int start_sendctrl_connection (settings *conf_settings) {
 	int ret = 0;
+	/* TODO: Verificar local melhor para id de threads, com configurações??? */
+	pthread_t sendctrl_thread_id;
 
-	if (conf_settings->mode == RECEIVER) {
-		inicializa thread para enviar mensagens de controle -- destino conhecido o server!
+	/* inicializa thread para enviar mensagens de controle */
+	if (pthread_create (sendctrl_thread_id, NULL, sendctrl_thread, (void *)conf_settings)) {
+		fprintf (stderr, "Could not sendctrl thread\n");
+		/*
+		 * TODO: LOG de DEBUG! Criar em local apropriado
+		 */
+		ret = -1;
 	}
-
-	inicializa thread para receber mensagens de controle
 
 	return ret;
 }
 
-//simplificado: executa teste continuo depois teste com trem de pacotes sempre
-void loop_control_sender (settings *conf_settings) {
-	send_inicio_teste () --através da conexão de controle envia inicio de teste e tipo de teste, adiona msg a lista de envio
-		espera_resposta --através da lista de mensagens recebidas
-	inicia_teste() --abre conexão, envia probes e retorna
-	recv_report() --através da conexão de controle recebe report do teste, alterar probe???
-	--envia mensagem de confirmação
-}
+int start_ctrl_connection (settings *conf_settings) {
+	int ret = 0;
+	/* TODO: Verificar local melhor para id de threads, com configurações??? */
+	pthread_t recvctrl_thread_id;
 
-void loop_control_receiver (settings *conf_settings) {
-	
-	while(modo=RECEIVER)
-		sleep...
-	{CALLBACK????
-		espera_msg_controle --através da conexão de controle espera mensagem de inicio de teste de up --lista de mensagens recebidas
-			mensagem de inicio de teste?
-			send_ok
-			inicia_recv_teste() --inicia recepção de teste, tipo, parametros...
-			cria_relatorio() --cria relatorio do teste e imprime (log, console...)
-			envia_relatorio_teste() --através da conexão de controle --lista de mensagens de envio
-				--espera mensagem de confirmação
+	if (conf_settings->mode == RECEIVER) {
+		/* inicializa thread para enviar mensagens de controle -- destino conhecido o server! */
+		ret = start_sendctrl_connection (conf_settings)
 	}
-	inicia_recv_teste() --inicia recepção de teste simplificado
-	cria_relatorio() --cria relatorio do teste e imprime (log, console...)
-	envia_relatorio_teste() --através da conexão de controle
+
+	/* inicializa thread para receber mensagens de controle */
+	if (pthread_create (recvctrl_thread_id, NULL, recvctrl_thread, (void *)conf_settings)) {
+		fprintf (stderr, "Could not recvctrl thread\n");
+		/*
+		 * TODO: LOG de DEBUG! Criar em local apropriado
+		 */
+		ret = -1;
+	}
+
+	return ret;
 }
-
-
 
 --CONTROLE DENTRO DAS THREADS DE SEND/RCV DE MENSAGENS DE CONTROLE
 
