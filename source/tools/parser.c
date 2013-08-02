@@ -43,12 +43,12 @@ const char short_options[] = "b:i:h:l:n:p:r:s:t:v:I:B:R:S:";
 */
 
 void usage(void) {
-	printf("\nUsage: ./UdpTester [--server recv_addr|-receiver] [options]"
+	printf("\nUsage: ./UdpTester [-S, --sender |-R, --receiver server_addr] [options]"
 		   "\nTry `./UdpTester --help' for more information.\n\n");
 }
 
 void help(void) {
-	printf("\nUsage: ./UdpTester [-S, --sender recv_addr|-R, --receiver] [options]"
+	printf("\nUsage: ./UdpTester [-S, --sender |-R, --receiver server_addr] [options]"
 		   "\n       ./UdpTester [-h, --help |-v, --version]\n");
 	printf("\nSender/Receiver:"
 		   "\n -B, --soc_buffer <size>                 Socket Buffer Size (min  %d, max %d, default %d Kbytes)"
@@ -87,7 +87,7 @@ void init_settings (settings *conf_settings) {
 	conf_settings->report_interval = DEFAULT_REPORT_INTERVAL;
 	conf_settings->test_interval = DEFAULT_TEST_INTERVAL;
 	conf_settings->soc_buffer = DEFAULT_SOC_BUFFER;
-	conf_settings->port = DEFAULT_CONTROL_PORT;
+	conf_settings->port = DEFAULT_DATA_PORT;
 }
 
 int parse_command_line (int argc, char **argv, settings *conf_settings) {
@@ -203,15 +203,15 @@ int parse_command_line (int argc, char **argv, settings *conf_settings) {
 					}
 					conf_settings->soc_buffer = config;
 					break;
-				case 'R':
-					conf_settings->mode = RECEIVER;
-					break;
 				case 'S':
-					i++;
-					struct sockaddr_in *sender_addr_in = (struct sockaddr_in *)&(conf_settings->address);
-					sender_addr_in->sin_family = AF_INET;
-					sender_addr_in->sin_addr.s_addr = inet_addr(argv[i]);
 					conf_settings->mode = SENDER;
+					break;
+				case 'R':
+					i++;
+					struct sockaddr_in *server_addr_in = (struct sockaddr_in *)&(conf_settings->address);
+					server_addr_in->sin_family = AF_INET;
+					server_addr_in->sin_addr.s_addr = inet_addr(argv[i]);
+					conf_settings->mode = RECEIVER;
 					break;
 				default:
 					ret = -1;

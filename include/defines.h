@@ -10,11 +10,12 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <netinet/in.h>
 
 /* constantes/ranges para parâmetros de entrada */
 
-/**\def DEFAULT_CONTROL_PORT
- * \brief Porta default para tráfego de controle.
+/**\def DEFAULT_DATA_PORT
+ * \brief Porta default para tráfego de dados.
  */
 #define	DEFAULT_DATA_PORT		33333
 
@@ -186,6 +187,15 @@
  */
 #define RMEM_SBUFFER_FILE		"/proc/sys/net/core/rmem_max"
 
+/**\def BACKLOG
+ * \brief Número máximo de conexões de controle em espera.
+ */
+#define BACKLOG 10
+
+/* provisório */
+#define SEND_PORT	11999
+#define RECV_PORT	22999
+ 
 /**\def OVERHEAD_SIZE
  * \brief Overhead UDP/TCP.
  */
@@ -231,28 +241,13 @@ typedef struct {
     int val;				/**< Parâmetro reduzido???. >*/
 } option;
 
-/**\struct settings
- * \brief Lista de configurações do UdpTester.
+/**\enum test_type
+ * \brief Enumeração para os tipos de teste.
  */
-typedef struct {
-	mode_type mode;					/**< Modo de operação do UdpTester. >*/
-	int bandwidth;					/**< Bandwidth para trasmissão em Mbps. >*/
-	int packet_size;				/**< Tamanho do pacotes em bytes. >*/
-	int train_num;					/**< Número de trens de pacotes por teste.> */
-	int train_size;					/**< Número de pacotes por trem. >*/
-	int train_interval;				/**< Intervalo entre trens de pacotes de um mesmo teste. >*/
-	int loop_test_interval;			/**< Intervalo entre testes consecutivos. >*/
-	int report_interval;			/**< Intervalo de report para testes de tráfego contínuos. >*/
-	int test_interval;				/**< Intervalo de teste para teste contínuo. >*/
-	int soc_buffer;					/**< Tamanho para o buffer do socket em KB. > */
-	int port;						/**< Porta para tráfego de dados. >*/
-	char address[MAXBUFFER_SIZE];	/**< Endereço de destino da transmissão. >*/
-	short recv_queue_id;
-	short send_queue_id;
-	ctrl_pkt **recv_queue;			/**< Fila de pacotes de controle recebidos. >*/
-	ctrl_pkt **send_queue;			/**< Fila de pacotes de controle para envio. >*/
-} settings;
-
+typedef enum {
+	UDP_CONTINUO = 0,			/**< Teste UDP com tráfego contínuo. >*/
+	UDP_PACKET_TRAIN,			/**< Teste UDP com trem de pacotes. >*/
+} test_type;
 
 /**\enum ctrlpacket_type
  * \brief Enumeração para os tipos de pacotes de controle.
@@ -269,13 +264,31 @@ typedef enum {
 	LOOP_TEST_INTERVAL,			/**< Mensagem para inicio de intervalo entre testes. >*/
 } ctrlpacket_type;
 
-/**\enum test_type
- * \brief Enumeração para os tipos de teste.
+/**\struct report
+ * \brief Relatório de teste udp.
  */
-typedef enum {
-	UDP_CONTINUO = 0,			/**< Teste UDP com tráfego contínuo. >*/
-	UDP_PACKET_TRAIN,			/**< Teste UDP com trem de pacotes. >*/
-} test_type;
+typedef struct {
+	test_type t_type;					/**< Tipo de teste realizado. */
+	int packet_size;					/**< Tamanho médio do pacote recebido. >*/
+	int packet_num;						/**< Número de pacotes recebidos. >*/
+	int bytes;							/**< Número de byres recebidos. >*/
+	int train_size;						/**< Tamanho médio dos trens de pacotes (número de pacotes). >*/
+	int train_num;						/**< Número de trens de pacotes. >*/
+	int train_interval;					/**< Intervalo entre trens de pacotes. >*/
+	int udp_port;						/**< Porta para teste UDP. >*/
+	struct timeval bw_med;				/**< Banda média calculada (em Mbps). >*/
+	struct timeval bw_max;				/**< Banda máxima calculada (em Mbps). >*/
+	struct timeval bw_min;				/**< Banda mínima calculada (em Mbps). >*/
+	int jitter_med;						/**< Jitter médio observado (em us). >*/
+	int jitter_max;						/**< Jitter máximo calculado (em us). >*/
+	int jitter_min;						/**< Jitter mínimo calculado (em us). >*/
+	struct timeval time_med;			/**< Tempo médio de teste (em s). >*/
+	struct timeval time_max;			/**< Tempo máximo de teste (em s). >*/
+	struct timeval time_min;			/**< Tempo mínimo de teste (em s). >*/
+	int lost_med;						/**< Número médio de pacotes perdidos. >*/
+	int lost_max;						/**< Número máximo de pacotes perdidos. >*/
+	int lost_min;						/**< Número mínimo de pacotes perdidos. >*/
+} report;
 
 /**\struct ctrlpacket
  * \brief Estrutura para os pacotes de controle.
@@ -304,4 +317,35 @@ typedef struct {
 	char valid;							/**< Flag de validade da informação no pacote. >*/
 	ctrlpacket *data;					/**< Ponteiro para pacote de controle. >*/
 } ctrl_pkt;
+
+/**\struct ctrl_queue
+ * \brief Estrutura para fila de pacotes de controle.
+ */
+typedef struct {
+	short start;							/**< Indíce para o início da fila (inserção). >*/
+	short end;								/**< Indíce para o fim da fila (remoção). >*/
+	short size;								/**< Número de elementos válidos na fila. >*/
+	ctrl_pkt **queue;						/**< Ponteiro para pacote de controle. >*/
+} ctrl_queue;
+
+/**\struct settings
+ * \brief Lista de configurações do UdpTester.
+ */
+typedef struct {
+	mode_type mode;					/**< Modo de operação do UdpTester. >*/
+	int bandwidth;					/**< Bandwidth para trasmissão em Mbps. >*/
+	int packet_size;				/**< Tamanho do pacotes em bytes. >*/
+	int train_num;					/**< Número de trens de pacotes por teste.> */
+	int train_size;					/**< Número de pacotes por trem. >*/
+	int train_interval;				/**< Intervalo entre trens de pacotes de um mesmo teste. >*/
+	int loop_test_interval;			/**< Intervalo entre testes consecutivos. >*/
+	int report_interval;			/**< Intervalo de report para testes de tráfego contínuos. >*/
+	int test_interval;				/**< Intervalo de teste para teste contínuo. >*/
+	int soc_buffer;					/**< Tamanho para o buffer do socket em KB. > */
+	int port;						/**< Porta para tráfego de dados. >*/
+	struct sockaddr_in address;		/**< Endereço de destino da transmissão. >*/
+	ctrl_queue recv_queue;			/**< Fila de pacotes de controle recebidos. >*/
+	ctrl_queue send_queue;			/**< Fila de pacotes de controle para envio. >*/
+} settings;
+
 #endif /* __DEFINES_H__ */

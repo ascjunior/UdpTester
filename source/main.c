@@ -5,12 +5,19 @@
  * \date June 25, 2013
  */
  
+#include <defines.h>
+#include <tools/parser.h>
+#include <tools/debug.h>
+#include <ctrl/ctrl.h>
+
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <time.h>
 
-#include <defines.h>
-#include <tools/parser.h>
+#include <sys/time.h>
+#include <arpa/inet.h>
 
 /**\fn int  main( int argc, char **argv )
  * \brief Inicialização da Buscard.
@@ -23,9 +30,9 @@ int main (int argc, char **argv) {
 
 	int ret = 0;
 	settings conf_settings;
-	ctrl_pkt recv_queue[MAX_CTRL_QUEUE];
-	ctrl_pkt send_queue[MAX_CTRL_QUEUE];
-	
+	ctrl_pkt *recv_queue[MAX_CTRL_QUEUE];
+	ctrl_pkt *send_queue[MAX_CTRL_QUEUE];
+
 	ret = parse_command_line (argc, argv, &conf_settings);
 	if (ret < 0) {
 		usage ();
@@ -35,16 +42,34 @@ int main (int argc, char **argv) {
 
 
 	/* inicializa fila de pacotes de controle */
+	/*
 	pktctrl_queue_init (&send_queue);
 	pktctrl_queue_init (&recv_queue);
-	conf_settings->send_queue = &send_queue;
-	conf_settings->recv_queue = &recv_queue;
+	*/
+	conf_settings.send_queue.queue = send_queue;
+	conf_settings.send_queue.size = 0;
+	conf_settings.send_queue.start = 0;
+	conf_settings.send_queue.end = 0;
+	conf_settings.recv_queue.queue = recv_queue;
+	conf_settings.recv_queue.size = 0;
+	conf_settings.recv_queue.start = 0;
+	conf_settings.recv_queue.end = 0;
 
+	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "settings:\n");
+	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "settings->mode: %s\n",
+			(conf_settings.mode == SENDER) ? "SENDER" : (conf_settings.mode == RECEIVER) ? "RECEIVER" : "UNKNOW");
+	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "settings->bandwidth: %dMbps\n", conf_settings.bandwidth);
+	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "settings->packet_size: %dbytes\n", conf_settings.packet_size);
+	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "settings_>interval: %dms\n", conf_settings.loop_test_interval);
+	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "settings->address: %s\n", inet_ntoa(conf_settings.address.sin_addr));
+
+	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "CALL start_ctrl_connection \n");
 	start_ctrl_connection (&conf_settings);
 
+	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "Start loop control...\n");
 	while (1) {
 		loop_control (&conf_settings);
-		usleep(1000);
+		usleep(1000000);
 	}
 	
 	return 0;

@@ -17,8 +17,6 @@ DOXYFILE=$(TARGET)_doxy
 
 include config.mk
 
-DEPS=objMain objTools
-
 all: $(TARGET)
 
 $(TARGET): $(DEPS)
@@ -35,6 +33,14 @@ objMain: force_look
 objTools: force_look
 	$(ECHO) looking into $(DIR_TOOLS) : $(MAKE) $(MFLAGS)
 	cd $(DIR_TOOLS); $(MAKE) $(MFLAGS)
+
+objThreads: force_look
+	$(ECHO) looking into $(DIR_THREADS) : $(MAKE) $(MFLAGS)
+	cd $(DIR_THREADS); $(MAKE) $(MFLAGS)
+
+objCtrl: force_look
+	$(ECHO) looking into $(DIR_CTRL) : $(MAKE) $(MFLAGS)
+	cd $(DIR_CTRL); $(MAKE) $(MFLAGS)
 
 clean:
 	$(ECHO) cleaning up in main directory
