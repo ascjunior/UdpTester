@@ -35,12 +35,43 @@ ctrlpacket *getnext_ctrlpacket (ctrl_queue *queue) {
 		if ((pkt->valid) && (pkt->data != NULL)) {
 			data = pkt->data;
 			pkt->valid = 0;
+			DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "MSG TYPE %s\n",
+						(data->cp_type == RECEIVER_CONNECT) ? "RECEIVER_CONNECT" :
+						(data->cp_type == SENDER_CONNECT) ? "SENDER_CONNECT" :
+						(data->cp_type == START_TEST_DOWN) ? "START_TEST_DOWN" :
+						(data->cp_type == FEEDBACK_START_TEST_DOWN) ? "FEEDBACK_START_TEST_DOWN" :
+						(data->cp_type == FEEDBACK_TEST_DOWN) ? "FEEDBACK_TEST_DOWN" :
+						(data->cp_type == START_TEST_UP) ? "START_TEST_UP" :
+						(data->cp_type == FEEDBACK_START_TEST_UP) ? "FEEDBACK_START_TEST_UP" :
+						(data->cp_type == FEEDBACK_TEST_UP) ? "FEEDBACK_TEST_UP" :
+						(data->cp_type == LOOP_TEST_INTERVAL) ? "LOOP_TEST_INTERVAL" : "UNKNOW");
 		}
 		pkt->valid = 0;
 		queue->end = (queue->end + 1) % MAX_CTRL_QUEUE;
 	}
 
 	return data;
+}
+
+int save_test_report (settings *conf_settings, ctrlpacket *data) {
+	int ret = 0;
+	report *pkt_report;
+
+	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "SAVE REPORT TEST FAKE...\n");
+	pkt_report = (report *)data->buffer;
+	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "MODE: %s\n",
+		(conf_settings->mode == SENDER) ? "SENDER" : (conf_settings->mode == RECEIVER) ? "RECEIVER" : "UNKNOW");
+	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "TEST TYPE  : %s\n",
+		(data->t_type == UDP_CONTINUO) ? "CONTINUO" : (data->t_type == UDP_PACKET_TRAIN) ? "TRAIN" : "UNKNOW");
+	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "PACKET SIZE: %d\n", pkt_report->packet_size);
+	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "PACKET NUM : %d\n", pkt_report->packet_num);
+	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "TOTAL BYTES: %d\n", pkt_report->bytes);
+	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "UDP PORT   : %d\n", pkt_report->udp_port);
+	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "BW MED     : %ld.%06ld\n", pkt_report->bw_med.tv_sec, pkt_report->bw_med.tv_usec);
+	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "JITTER     : %dus\n", pkt_report->jitter_med);
+	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "TIME       : %ld.%06ld\n", pkt_report->time_med.tv_sec, pkt_report->time_med.tv_usec);
+
+	return ret;
 }
 
 int start_sendctrl_connection (settings *conf_settings) {
@@ -199,6 +230,7 @@ receiver:
 			case FEEDBACK_TEST_DOWN:			/**< Relatório de teste de download. >*/
 				if (conf_settings->mode == SENDER) {
 					printf ("SAVED REPORT TEST DOWN!!!\n");
+					save_test_report (conf_settings, data);
 /*
 sender:
 	armazena relatório de teste down (feedback do cliente, alterar probe em função dos resultados???)
@@ -210,6 +242,7 @@ receiver:
 			case START_TEST_UP:				/**< Requisição para teste de upload. >*/
 				if (conf_settings->mode == SENDER) {
 					DEBUG_LEVEL_MSG (DEBUG_LEVEL_LOW, "RECV TEST UP THREAD CREATED!!\n");
+					start_recvtest_thread (conf_settings);
 /*
 sender:
 	cria thread para receber teste up (tipo de teste na mensagem???)
@@ -239,7 +272,9 @@ receiver:
 				break;
 			case FEEDBACK_START_TEST_UP:		/**< Confirmação para início de teste de upload. >*/
 				if (conf_settings->mode == RECEIVER) {
-					printf ("SEND TEST UP THREAD CREATED!!\n");
+					DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "SEND TEST UP THREAD CREATED!!\n");
+					start_sendtest_thread (conf_settings);
+
 /*
 sender:
 	nada a fazer :(
@@ -250,7 +285,8 @@ receiver:
 				break;
 			case FEEDBACK_TEST_UP:			/**< Relatório de teste de upload. >*/
 				if (conf_settings->mode == RECEIVER) {
-					printf ("SAVED REPORT TEST UP!!!\n");
+					DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "SAVED REPORT TEST UP!!!\n");
+					save_test_report (conf_settings, data);
 /*
 sender:
 	nada a fazer :(
@@ -267,6 +303,22 @@ receiver:
 				if (conf_settings->mode == SENDER) {
 					printf ("Sleep ctrl by %dms\n", 5000);
 					usleep (5000000);
+				if (conf_settings->mode == SENDER) {
+					ctrl_pkt **pkt_queue =recvctrl_queue->queue;
+
+					if ((pkt_queue[recvctrl_queue->start] != NULL))
+						recvctrl_queue->start = (recvctrl_queue->start + 1) % MAX_CTRL_QUEUE;
+
+					if (pkt_queue[recvctrl_queue->start] == NULL) {
+						pkt_queue[recvctrl_queue->start] = (ctrl_pkt *)malloc(sizeof(ctrl_pkt));
+						pkt_queue[recvctrl_queue->start]->data = (ctrlpacket *)malloc(sizeof(ctrlpacket));
+					}
+					pkt_queue[recvctrl_queue->start]->valid = 1;
+					data = pkt_queue[recvctrl_queue->start]->data;
+					data->cp_type = SENDER_CONNECT;
+					data->packet_size = sizeof(ctrlpacket);
+					DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "ADD MSG SENDER_CONNECT to RECV STACK!!\n");
+				}
 /*
 sender:
 	loop(test_interval)

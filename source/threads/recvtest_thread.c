@@ -22,8 +22,9 @@
 
 void *recvtest_thread (void *param) {
 	settings *conf_settings = (settings *)param;
+	ctrl_queue *send_queue = &(conf_settings->send_queue);
 	ctrl_queue *recv_queue = &(conf_settings->recv_queue);
-	ctrl_pkt **pkt_queue = recv_queue->queue;
+	ctrl_pkt **pkt_queue = send_queue->queue;
 	ctrlpacket *data;
 	report pkt_report;
 
@@ -35,6 +36,7 @@ void *recvtest_thread (void *param) {
 	 */
 
 	/* sleep para simular teste */
+	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "RECV TEST THREAD FAKE... SLEEP by 5s\n");
 	usleep (5000000);
 
 	/* criar relatório fake */
@@ -47,22 +49,55 @@ void *recvtest_thread (void *param) {
 	pkt_report.bw_med.tv_sec = 25;
 	pkt_report.bw_med.tv_usec = 424242;
 	pkt_report.jitter_med = 1250;
-	pkt_report.bw_med.tv_sec = 0;
-	pkt_report.bw_med.tv_usec = 504242;
+	pkt_report.time_med.tv_sec = 0;
+	pkt_report.time_med.tv_usec = 504242;
 
-	if ((pkt_queue[recv_queue->start] != NULL))
-		recv_queue->start = (recv_queue->start + 1) % MAX_CTRL_QUEUE;
+	if ((pkt_queue[send_queue->start] != NULL))
+		send_queue->start = (send_queue->start + 1) % MAX_CTRL_QUEUE;
 
-	if (pkt_queue[recv_queue->start] == NULL) {
-		pkt_queue[recv_queue->start] = (ctrl_pkt *)malloc(sizeof(ctrl_pkt));
-		pkt_queue[recv_queue->start]->data = (ctrlpacket *)malloc(sizeof(ctrlpacket));
+	if (pkt_queue[send_queue->start] == NULL) {
+		pkt_queue[send_queue->start] = (ctrl_pkt *)malloc(sizeof(ctrl_pkt));
+		pkt_queue[send_queue->start]->data = (ctrlpacket *)malloc(sizeof(ctrlpacket));
 	}
-	pkt_queue[recv_queue->start]->valid = 1;
-	data = pkt_queue[recv_queue->start]->data;
-	data->cp_type = FEEDBACK_TEST_DOWN;
+	pkt_queue[send_queue->start]->valid = 1;
+	data = pkt_queue[send_queue->start]->data;
+	if (conf_settings->mode == RECEIVER) {
+		data->cp_type = FEEDBACK_TEST_DOWN;
+		DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "ADD MSG FEEDBACK_TEST_DOWN to SEND MSG STACK %d\n", send_queue->start);
+	}
+	else {
+		data->cp_type = FEEDBACK_TEST_UP;
+		DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "ADD MSG FEEDBACK_TEST_UP to SEND MSG STACK %d\n", send_queue->start);
+	}
 	data->packet_size = sizeof(report);
 	memcpy (data->buffer, &pkt_report, sizeof(report));
-	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "ADD MSG FEEDBACK_TEST_DOWN to RECV MSG STACK %d\n", recv_queue->start);
+
+	if (conf_settings->mode == RECEIVER) {
+		send_queue->start = (send_queue->start + 1) % MAX_CTRL_QUEUE;
+		if (pkt_queue[send_queue->start] == NULL) {
+			pkt_queue[send_queue->start] = (ctrl_pkt *)malloc(sizeof(ctrl_pkt));
+			pkt_queue[send_queue->start]->data = (ctrlpacket *)malloc(sizeof(ctrlpacket));
+		}
+		pkt_queue[send_queue->start]->valid = 1;
+		data = pkt_queue[send_queue->start]->data;
+		data->cp_type = START_TEST_UP;
+		data->packet_size = sizeof(report);
+		DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "ADD MSG START_TEST_UP to SEND MSG STACK %d\n", send_queue->start);
+	}
+	else {
+		pkt_queue = recv_queue->queue;
+		if ((pkt_queue[recv_queue->start] != NULL))
+			recv_queue->start = (recv_queue->start + 1) % MAX_CTRL_QUEUE;
+		if (pkt_queue[recv_queue->start] == NULL) {
+			pkt_queue[recv_queue->start] = (ctrl_pkt *)malloc(sizeof(ctrl_pkt));
+			pkt_queue[recv_queue->start]->data = (ctrlpacket *)malloc(sizeof(ctrlpacket));
+		}
+		pkt_queue[recv_queue->start]->valid = 1;
+		data = pkt_queue[recv_queue->start]->data;
+		data->cp_type = LOOP_TEST_INTERVAL;
+		data->packet_size = sizeof(report);
+		DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "ADD MSG LOOP_TEST_INTERVAL to RECV MSG STACK %d\n", recv_queue->start);
+	}
 
 	return NULL;
 }

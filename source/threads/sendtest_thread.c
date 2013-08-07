@@ -24,6 +24,7 @@ void *sendtest_thread (void *param) {
 	//settings *conf_settings = (settings *)param;
 
 	/* teste fake (por enquanto)... */
+	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "SEND TEST THREAD FAKE... SLEEP by 5s\n");
 	usleep (5000000);
 
 	return NULL;

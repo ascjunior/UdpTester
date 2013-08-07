@@ -26,6 +26,18 @@ int start_ctrl_connection (settings *conf_settings);
  */
 ctrlpacket *getnext_ctrlpacket (ctrl_queue *queue);
 
+/**\fn int save_test_report (settings *conf_settings, ctrlpacket *data)
+ * \brief Método save para relatório de teste.
+ * 
+ *   Salva o relatório de teste e altera, caso seja necessário, as configurações
+ * de teste.
+ * 
+ * \param conf_settings Configurações de controle do teste.
+ * \param data Relatório de teste recebido.
+ * \return 0 em caso de sucesso, ~0 caso contrário.
+ */
+int save_test_report (settings *conf_settings, ctrlpacket *data);
+
 /**\fn int start_sendctrl_connection (settings *conf_settings)
  * \brief Inicializa conexão para envio de mensagens de controle (exclusivo).
  * 
