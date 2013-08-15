@@ -9,6 +9,7 @@
 #include <defines.h>
 #include <tools/debug.h>
 #include <threads/recvtest_thread.h>
+#include <modules/continuo_burst.h>
 
 #include <sys/types.h>
 #include <sys/time.h>
@@ -37,8 +38,17 @@ void *recvtest_thread (void *param) {
 
 	/* sleep para simular teste */
 	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "RECV TEST THREAD FAKE... SLEEP by 5s\n");
-	usleep (5000000);
+	//usleep (5000000);
 
+	if (conf_settings->t_type == UDP_CONTINUO) {
+		DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "CALL recv_continuo_burst\n");
+		recv_continuo_burst (conf_settings->udp_port,
+				conf_settings->recvsock_buffer,
+				conf_settings->test.cont.report_interval, NULL, NULL);
+	}
+	else
+		DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "Could'nt start send test: test type (%d) != continuo (%d)\n",
+							conf_settings->t_type, UDP_CONTINUO);
 	/* criar relatório fake */
 	memset (&pkt_report, 0, sizeof(report));
 	pkt_report.t_type = UDP_CONTINUO;

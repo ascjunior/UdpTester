@@ -58,9 +58,9 @@ int main (int argc, char **argv) {
 	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "settings:\n");
 	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "settings->mode: %s\n",
 			(conf_settings.mode == SENDER) ? "SENDER" : (conf_settings.mode == RECEIVER) ? "RECEIVER" : "UNKNOW");
-	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "settings->bandwidth: %dMbps\n", conf_settings.bandwidth);
+	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "settings->bandwidth: %dMbps\n", conf_settings.udp_rate);
 	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "settings->packet_size: %dbytes\n", conf_settings.packet_size);
-	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "settings_>interval: %dms\n", conf_settings.loop_test_interval);
+	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "settings_>interval: %dms\n", conf_settings.loop_interval);
 	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "settings->address: %s\n", inet_ntoa(conf_settings.address.sin_addr));
 
 	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "CALL start_ctrl_connection \n");

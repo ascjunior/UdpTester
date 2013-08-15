@@ -17,7 +17,7 @@
 #endif
 
 #ifdef DEBUG
-	#define DEBUG_MSG(fmt, ...)		{ fprintf(stderr, "%s:%s:%d: "fmt, __FILE__, __FUNCTION__, __LINE__, ## __VA_ARGS__); }
+	#define DEBUG_MSG(fmt, ...)				{ fprintf(stderr, "%s:%s:%d: "fmt, __FILE__, __FUNCTION__, __LINE__, ## __VA_ARGS__); }
 #else
 	#define DEBUG_MSG(fmt, ...)
 #endif
@@ -29,5 +29,12 @@
 	#define DEBUG_LEVEL_MSG(lvl, fmt, ...)
 #endif
 
+#define LOG_FILE(fname, fmt, ...)				{ FILE *fp = fopen (fname, "a"); \
+												  if ( fp != NULL ) { \
+													fprintf (fp, fmt, ## __VA_ARGS__); \
+													fflush (fp); \
+													fclose (fp); \
+												  } \
+												}
 
 #endif /* __DEBUG_H__ */

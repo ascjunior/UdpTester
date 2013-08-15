@@ -42,6 +42,10 @@ objCtrl: force_look
 	$(ECHO) looking into $(DIR_CTRL) : $(MAKE) $(MFLAGS)
 	cd $(DIR_CTRL); $(MAKE) $(MFLAGS)
 
+objModules: force_look
+	$(ECHO) looking into $(DIR_MODULES) : $(MAKE) $(MFLAGS)
+	cd $(DIR_MODULES); $(MAKE) $(MFLAGS)
+
 clean:
 	$(ECHO) cleaning up in main directory
 	$(RM) -rf *.o $(TARGET) $(DOCS_DIR) $(DOXY_LOG) $(DOXYFILE).orig

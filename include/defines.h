@@ -142,7 +142,7 @@
 /**\def MIN_REPORT_INTERVAL
  * \brief Intervalo mínimo entre reports de resultado (em s).
  */
-#define	MIN_REPORT_INTERVAL		5	
+#define	MIN_REPORT_INTERVAL		1	
 
 /**\def MIN_REPORT_INTERVAL
  * \brief Intervalo máximo entre reports de resultado (em s).
@@ -152,7 +152,22 @@
 /**\def DEFAULT_REPORT_INTERVAL
  * \brief Intervalo default entre reports de resultado (em s).
  */
-#define	DEFAULT_REPORT_INTERVAL	10
+#define	DEFAULT_REPORT_INTERVAL	1
+
+/**\def MIN_BURST_SIZE
+ * \brief Tamanho mínimo do burst de dados para teste (em MB).
+ */
+#define MIN_BURST_SIZE			2
+
+/**\def MAX_BURST_SIZE
+ * \brief Tamanho máximo do burst de dados para teste (em MB).
+ */
+#define MAX_BURST_SIZE			1000
+
+/**\def DEFAULT_BURST_SIZE
+ * \brief Tamanho default do burst de dados para teste (em MB).
+ */
+#define DEFAULT_BURST_SIZE		5
 
 
 /* constantes/ranges para variáveis internas */
@@ -192,6 +207,16 @@
  */
 #define BACKLOG 10
 
+/**\def NPACKET_END_TEST
+ * \brief Número de pacotes de fim de teste.
+ */
+#define NPACKET_END_TEST		100
+
+/**\def PACKET_END_TEST
+ * \brief Identificador de pacote de fim de teste.
+ */
+#define PACKET_END_TEST			-1
+
 /* provisório */
 #define SEND_PORT	11999
 #define RECV_PORT	22999
@@ -211,8 +236,29 @@
 /**\def STR_VERSION
  * \brief String de versão.
  */
-#define STR_VERSION				"UdpTester Version "
+#define STR_VERSION						"UdpTester Version "
 
+/**\def DEFAULT_SENDCONT_BURST_LOGFILE
+ * \brief Arquivo default para log da transmissão  de  teste  contínuo udp  com
+ * limite em bytes.
+ */
+#define	DEFAULT_SENDCONT_BURST_LOGFILE	"UdpTester_SendUDPContBytes.txt"
+
+/**\def DEFAULT_RECVCONT_BURST_LOGFILE
+ * \brief Arquivo default para log da recepção de teste contínuo udp  com limite
+ * em bytes.
+ */
+#define	DEFAULT_RECVCONT_BURST_LOGFILE	"UdpTester_RecvUDPContBytes.txt"
+
+/**def DEFAULT_INTERFACE_NAME
+ * \brief Interface default para observação em teste udp contínuo.
+ */
+#define DEFAULT_INTERFACE_NAME			"eth0"
+
+/**\def RECVCAPTURE_TIMEOUT
+ * \brief Timeout default para captura de teste udp contínuo (em ms).
+ */
+#define RECVCAPTURE_TIMEOUT				1000
 
 /**\enum mode_type
  * \brief Enumeração para os modos de operação do UdpTester
@@ -264,6 +310,27 @@ typedef enum {
 	LOOP_TEST_INTERVAL,			/**< Mensagem para inicio de intervalo entre testes. >*/
 } ctrlpacket_type;
 
+/**\struct ttype_cont
+ * \brief Estrutura de dados com informações específicas para testes com tráfego
+ * contínuo.
+ */
+typedef struct {
+	int size;						/**< Tamanho em MB do burst de dados transmitidos no teste (continuo). */
+	int pkt_num;					/**< Número de pacotes. >*/
+	int interval;					/**< Intervalo de teste. >*/
+	int report_interval;			/**< Intervalo para amostragem. >*/
+} ttype_cont;
+
+/**\struct ttype_train
+ * \brief Estrutura de dados com informações específicas para testes com tráfego
+ * de trem de pacotes.
+ */
+typedef struct {
+	int num;						/**< Número de trens de pacotes . >*/
+	int size;						/**< Tamanho (em número de pacotes) dos trens de pacotes . >*/
+	int interval;					/**< Intervalo entre trens de pacotes. >*/
+} ttype_train;
+
 /**\struct report
  * \brief Relatório de teste udp.
  */
@@ -294,20 +361,20 @@ typedef struct {
  * \brief Estrutura para os pacotes de controle.
  */
 typedef struct {
-	ctrlpacket_type cp_type;			/**< Tipo de pacote de controle. >*/
-	int packet_size;					/**< Tamanho do pacote (header+payload). >*/
-	uint connected_address;				/**< Endereço do host remoto conectado ao server. >*/
-	test_type t_type;					/**< Tipo de teste (contínuo ou trem de pacotes). >*/
-	int test_packet_size;				/**< Tamanho do pacote para teste. >*/
-	int test_train_size;				/**< Tamanho do trem de pacotes (número de pacotes). >*/
-	int test_train_num;					/**< Número de trens de pacotes (intervalo de teste, caso teste contínuo). >*/
-	int test_train_interval;			/**< Intervalo entre trens de pacotes (ou intervalo para amostragem em caso de teste contínuo). >*/
-	int test_udp_port;					/**< Porta para teste UDP. >*/
-	int test_udp_rate;					/**< Taxa de transmissão do teste UDP (em Mbps). >*/
-	int test_sendsock_buffer;			/**< Tamanho do buffer do socket para envio do teste. >*/
-	int test_recvsock_buffer;			/**< Tamanho do buffer do socket para receber o teste. >*/
-	int test_loop_interval;				/**< Intervalo entre testes. >*/
-	char buffer[MAX_PAYLOAD];			/**< Payload para relatório do teste. >*/
+	ctrlpacket_type cp_type;		/**< Tipo de pacote de controle. >*/
+	test_type t_type;				/**< Tipo de teste (contínuo ou trem de pacotes). >*/
+	uint connected_address;			/**< Endereço do host remoto conectado ao server. >*/
+	int udp_port;					/**< Porta para teste UDP. >*/
+	int udp_rate;					/**< Taxa de transmissão do teste UDP (em Mbps). >*/
+	int packet_size;				/**< Tamanho do pacote para teste. >*/
+	int loop_interval;				/**< Intervalo entre testes. >*/
+	int sendsock_buffer;			/**< Tamanho do buffer do socket para envio do teste. >*/
+	int recvsock_buffer;			/**< Tamanho do buffer do socket para receber o teste. >*/
+	union {
+		ttype_cont cont;			/**< Configurações específicas para teste com tráfego contínuo. >*/
+		ttype_train train;			/**< Configurações específicas para teste com tráfego de trem de pacotes. >*/
+	} test;
+	char buffer[MAX_PAYLOAD];		/**< Payload para relatório do teste. >*/
 } ctrlpacket;
 
 /**\struct ctrl_pkt
@@ -333,17 +400,18 @@ typedef struct {
  */
 typedef struct {
 	mode_type mode;					/**< Modo de operação do UdpTester. >*/
-	int bandwidth;					/**< Bandwidth para trasmissão em Mbps. >*/
-	int packet_size;				/**< Tamanho do pacotes em bytes. >*/
-	int train_num;					/**< Número de trens de pacotes por teste.> */
-	int train_size;					/**< Número de pacotes por trem. >*/
-	int train_interval;				/**< Intervalo entre trens de pacotes de um mesmo teste. >*/
-	int loop_test_interval;			/**< Intervalo entre testes consecutivos. >*/
-	int report_interval;			/**< Intervalo de report para testes de tráfego contínuos. >*/
-	int test_interval;				/**< Intervalo de teste para teste contínuo. >*/
-	int soc_buffer;					/**< Tamanho para o buffer do socket em KB. > */
-	int port;						/**< Porta para tráfego de dados. >*/
+	test_type t_type;				/**< Tipo de teste (contínuo ou trem de pacotes). >*/
 	struct sockaddr_in address;		/**< Endereço de destino da transmissão. >*/
+	int udp_port;					/**< Porta para tráfego de dados. >*/
+	int udp_rate;					/**< Bandwidth para trasmissão em Mbps. >*/
+	int packet_size;				/**< Tamanho do pacotes em bytes. >*/
+	int loop_interval;				/**< Intervalo entre testes consecutivos. >*/
+	int sendsock_buffer;			/**< Tamanho do buffer do socket para envio do teste. >*/
+	int recvsock_buffer;			/**< Tamanho do buffer do socket para receber o teste. >*/
+	union {
+		ttype_cont cont;			/**< Configurações específicas para teste com tráfego contínuo. >*/
+		ttype_train train;			/**< Configurações específicas para teste com tráfego de trem de pacotes. >*/
+	} test;
 	ctrl_queue recv_queue;			/**< Fila de pacotes de controle recebidos. >*/
 	ctrl_queue send_queue;			/**< Fila de pacotes de controle para envio. >*/
 } settings;

@@ -219,6 +219,7 @@ receiver:
 				if (conf_settings->mode == SENDER) {
 					DEBUG_LEVEL_MSG (DEBUG_LEVEL_LOW, "SEND TEST DOWN THREAD CREATED!!!\n");
 					start_sendtest_thread (conf_settings);
+
 /*
 sender:
 	cria thread para envio de teste de down
