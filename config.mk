@@ -20,7 +20,7 @@ CFLAGS+= -DDEBUG_LEVEL
 CFLAGS+= -DDEBUG_LEVEL_DEFAULT=0
 	
 MAINOBJS=main.o
-TOOLSOBJS=parser.o
+TOOLSOBJS=parser.o tmath.o
 CTRLOBJS=ctrl.o
 THREADSOBJS=recvctrl_thread.o sendctrl_thread.o recvtest_thread.o sendtest_thread.o
 MODULESOBJS=continuo_burst.o
