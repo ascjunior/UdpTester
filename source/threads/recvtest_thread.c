@@ -19,6 +19,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <pthread.h>
 
 
 void *recvtest_thread (void *param) {
@@ -28,86 +29,98 @@ void *recvtest_thread (void *param) {
 	ctrl_pkt **pkt_queue = send_queue->queue;
 	ctrlpacket *data;
 	report pkt_report;
+	resume *result = &(pkt_report.result);
 
-	/* teste fake (por enquanto)...
-	 *   -- sleep de teste...
-	 *     -- criar relatório fake
-	 *     -- colocar relatório fake em pkt e add a stack de msg de controle para envio
-	 *     -- cria msg de inicio de teste de up e add a stack de msg de controle
-	 */
-
-	/* sleep para simular teste */
-	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "RECV TEST THREAD FAKE... SLEEP by 5s\n");
-	//usleep (5000000);
+	memset (&pkt_report, 0, sizeof(report));
+	result->jitter_min = 10000000;
+	result->bw_min.tv_sec = 1000000000;
 
 	if (conf_settings->t_type == UDP_CONTINUO) {
-		DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "CALL recv_continuo_burst\n");
-		recv_continuo_burst (conf_settings->udp_port,
+		recv2_continuo_burst (conf_settings->udp_port,
 				conf_settings->recvsock_buffer,
-				conf_settings->test.cont.report_interval, NULL, NULL);
+				conf_settings->test.cont.report_interval, conf_settings->iface, NULL, result);
+		//usleep (6000000);
 	}
 	else
 		DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "Could'nt start send test: test type (%d) != continuo (%d)\n",
 							conf_settings->t_type, UDP_CONTINUO);
-	/* criar relatório fake */
-	memset (&pkt_report, 0, sizeof(report));
-	pkt_report.t_type = UDP_CONTINUO;
-	pkt_report.packet_size = 1280;
-	pkt_report.packet_num = 1504;
-	pkt_report.bytes = 1925120;
-	pkt_report.udp_port = 33333;
-	pkt_report.bw_med.tv_sec = 25;
-	pkt_report.bw_med.tv_usec = 424242;
-	pkt_report.jitter_med = 1250;
-	pkt_report.time_med.tv_sec = 0;
-	pkt_report.time_med.tv_usec = 504242;
 
-	if ((pkt_queue[send_queue->start] != NULL))
-		send_queue->start = (send_queue->start + 1) % MAX_CTRL_QUEUE;
+	/* configurações do teste */
+	pkt_report.t_type = conf_settings->t_type;
+	pkt_report.packet_size = conf_settings->packet_size;
+	pkt_report.udp_rate = conf_settings->udp_rate;
+	pkt_report.udp_port = conf_settings->udp_port;
+	pkt_report.test.cont.size = conf_settings->test.cont.size;
+	pkt_report.test.cont.pkt_num = (conf_settings->test.cont.size * 1000000) / conf_settings->packet_size;
+	if (((conf_settings->test.cont.size * 1000000) % conf_settings->packet_size))
+		pkt_report.test.cont.pkt_num++;
+	pkt_report.test.cont.interval = conf_settings->test.cont.interval;
+	pkt_report.test.cont.report_interval	= conf_settings->test.cont.report_interval;
 
-	if (pkt_queue[send_queue->start] == NULL) {
-		pkt_queue[send_queue->start] = (ctrl_pkt *)malloc(sizeof(ctrl_pkt));
-		pkt_queue[send_queue->start]->data = (ctrlpacket *)malloc(sizeof(ctrlpacket));
-	}
+	/* resultados */
+	result->loss_med = pkt_report.test.cont.pkt_num - result->packet_num;
+
+	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "SEND REPORT TEST...\n");
+	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "MODE: %s\n",
+		(conf_settings->mode == SENDER) ? "SENDER" : (conf_settings->mode == RECEIVER) ? "RECEIVER" : "UNKNOW");
+	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "TEST TYPE             : %s\n",
+		(conf_settings->t_type == UDP_CONTINUO) ? "CONTINUO" : (conf_settings->t_type == UDP_PACKET_TRAIN) ? "TRAIN" : "UNKNOW");
+	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "PACKET SIZE           : %d\n", result->packet_size);
+	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "PACKET NUM            : %d\n", result->packet_num);
+	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "TOTAL BYTES           : %d\n", result->bytes);
+	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "UDP PORT              : %d\n", pkt_report.udp_port);
+	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "BW MED                : %d.%06d\n",
+						result->bw_med.tv_sec, result->bw_med.tv_usec);
+	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "JITTER (med, min, max): %dus\t%dus\t%dus\n",
+						result->jitter_med, result->jitter_min, result->jitter_max);
+	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "LOSS                  : %d\n", result->loss_med);
+	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "TIME                  : %d.%06d\n",
+						result->time_med.tv_sec, result->time_med.tv_usec);
+
+	pthread_mutex_lock (&(send_queue->mutex));
+	
+	send_queue->start = (send_queue->start + 1) % MAX_CTRL_QUEUE;
 	pkt_queue[send_queue->start]->valid = 1;
-	data = pkt_queue[send_queue->start]->data;
+	data = &(pkt_queue[send_queue->start]->data);
 	if (conf_settings->mode == RECEIVER) {
 		data->cp_type = FEEDBACK_TEST_DOWN;
-		DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "ADD MSG FEEDBACK_TEST_DOWN to SEND MSG STACK %d\n", send_queue->start);
+		DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "ADD MSG FEEDBACK_TEST_DOWN to SEND MSG STACK %d (%lu)\n", send_queue->start, sizeof(report));
 	}
 	else {
 		data->cp_type = FEEDBACK_TEST_UP;
 		DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "ADD MSG FEEDBACK_TEST_UP to SEND MSG STACK %d\n", send_queue->start);
 	}
-	data->packet_size = sizeof(report);
+	data->packet_size = sizeof(ctrlpacket);
 	memcpy (data->buffer, &pkt_report, sizeof(report));
 
+	pthread_mutex_unlock (&(send_queue->mutex));
+
 	if (conf_settings->mode == RECEIVER) {
-		send_queue->start = (send_queue->start + 1) % MAX_CTRL_QUEUE;
-		if (pkt_queue[send_queue->start] == NULL) {
-			pkt_queue[send_queue->start] = (ctrl_pkt *)malloc(sizeof(ctrl_pkt));
-			pkt_queue[send_queue->start]->data = (ctrlpacket *)malloc(sizeof(ctrlpacket));
-		}
-		pkt_queue[send_queue->start]->valid = 1;
-		data = pkt_queue[send_queue->start]->data;
+		DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "conf_settings->mode == RECEIVER, SET MSG START_TEST_UP\n");
+		pthread_mutex_lock (&(recv_queue->mutex));
+
+		pkt_queue = recv_queue->queue;
+		recv_queue->start = (recv_queue->start + 1) % MAX_CTRL_QUEUE;
+		pkt_queue[recv_queue->start]->valid = 1;
+		data = &(pkt_queue[recv_queue->start]->data);
 		data->cp_type = START_TEST_UP;
-		data->packet_size = sizeof(report);
-		DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "ADD MSG START_TEST_UP to SEND MSG STACK %d\n", send_queue->start);
+		data->packet_size = sizeof (report);
+
+		pthread_mutex_unlock (&(recv_queue->mutex));
 	}
 	else {
+		pthread_mutex_lock (&(recv_queue->mutex));
+
 		pkt_queue = recv_queue->queue;
-		if ((pkt_queue[recv_queue->start] != NULL))
-			recv_queue->start = (recv_queue->start + 1) % MAX_CTRL_QUEUE;
-		if (pkt_queue[recv_queue->start] == NULL) {
-			pkt_queue[recv_queue->start] = (ctrl_pkt *)malloc(sizeof(ctrl_pkt));
-			pkt_queue[recv_queue->start]->data = (ctrlpacket *)malloc(sizeof(ctrlpacket));
-		}
+		recv_queue->start = (recv_queue->start + 1) % MAX_CTRL_QUEUE;
 		pkt_queue[recv_queue->start]->valid = 1;
-		data = pkt_queue[recv_queue->start]->data;
+		data = &(pkt_queue[recv_queue->start]->data);
 		data->cp_type = LOOP_TEST_INTERVAL;
 		data->packet_size = sizeof(report);
-		DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "ADD MSG LOOP_TEST_INTERVAL to RECV MSG STACK %d\n", recv_queue->start);
+
+		pthread_mutex_unlock (&(recv_queue->mutex));
 	}
 
+	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "return NULL...\n");
 	return NULL;
 }

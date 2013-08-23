@@ -2,7 +2,7 @@
  * \brief Declaração de métodos para parser de linha de comando no UdpTester.
  *  
  * \author Alberto Carvalho
- * \date June 26, 2013
+ * \date June 26, 2013.
  */
 
 #ifndef __PARSER_H__

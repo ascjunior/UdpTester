@@ -2,7 +2,7 @@
  * \brief Declaração de métodos para mensagens de debug UdpTester.
  *  
  * \author Alberto Carvalho
- * \date Aug 1, 2013
+ * \date Aug 1, 2013.
  */
  
 #ifndef __DEBUG_H__

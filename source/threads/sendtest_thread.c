@@ -21,22 +21,24 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+
 
 void *sendtest_thread (void *param) {
 	settings *conf_settings = (settings *)param;
 
-	/* teste fake (por enquanto)... */
-	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "SEND TEST THREAD FAKE... SLEEP by 5s\n");
-	//usleep (5000000);
 	if (conf_settings->t_type == UDP_CONTINUO) {
-		DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "CALL send_continuo_burst\n");
+		DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "CALL send_continuo_burst to %s\n", inet_ntoa(conf_settings->address.sin_addr));
 		send_continuo_burst (conf_settings->udp_port,
-			conf_settings->sendsock_buffer,
-			conf_settings->udp_rate, conf_settings->test.cont.size, conf_settings->packet_size, NULL);
+			conf_settings->sendsock_buffer, conf_settings->udp_rate,
+			conf_settings->test.cont.size, conf_settings->packet_size,
+			conf_settings->address.sin_addr.s_addr, NULL);
+		//usleep (5000000);
 	}
 	else
 		DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "Could'nt start send test: test type (%d) != continuo (%d)\n",
 							conf_settings->t_type, UDP_CONTINUO);
-
 	return NULL;
 }
