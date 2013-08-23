@@ -80,32 +80,32 @@
 #define	DEFAULT_TRAIN_INTERVAL	500
 
 /**\def MIN_TEST_INTERVAL
- * \brief Intervalo mínimo de teste (em s).
+ * \brief Intervalo mínimo de teste (em ms).
  */
-#define	MIN_TEST_INTERVAL		5	
+#define	MIN_TEST_INTERVAL		100	
 
 /**\def MAXTEST_INTERVAL
- * \brief Intervalo máximo de teste (em s).
+ * \brief Intervalo máximo de teste (em ms).
  */
-#define	MAX_TEST_INTERVAL		30
+#define	MAX_TEST_INTERVAL		10000
 
 /**\def DEFAULT_TEST_INTERVAL
- * \brief Intervalo default de teste (em s).
+ * \brief Intervalo default de teste (em ms).
  */
-#define	DEFAULT_TEST_INTERVAL	10
+#define	DEFAULT_TEST_INTERVAL	1000
 
 /**\def MIN_LOOP_TEST_INTERVAL
- * \brief Intervalo mínimo entre testes (em m).
+ * \brief Intervalo mínimo entre testes (em s).
  */
 #define	MIN_LOOP_TEST_INTERVAL		10	
 
 /**\def MAX_LOOP_TEST_INTERVAL
- * \brief Intervalo máximo entre testes (em m).
+ * \brief Intervalo máximo entre testes (em s).
  */
 #define	MAX_LOOP_TEST_INTERVAL		120
 
 /**\def DEFAULT_LOOP_TEST_INTERVAL
- * \brief Intervalo default entre teste (em m).
+ * \brief Intervalo default entre teste (em s).
  */
 #define	DEFAULT_LOOP_TEST_INTERVAL	15
 
@@ -140,19 +140,19 @@
 #define DEFAULT_SEND_RATE		MIN_SEND_RATE
 
 /**\def MIN_REPORT_INTERVAL
- * \brief Intervalo mínimo entre reports de resultado (em s).
+ * \brief Intervalo mínimo entre reports de resultado (em ms).
  */
-#define	MIN_REPORT_INTERVAL		1	
+#define	MIN_REPORT_INTERVAL		100
 
 /**\def MIN_REPORT_INTERVAL
- * \brief Intervalo máximo entre reports de resultado (em s).
+ * \brief Intervalo máximo entre reports de resultado (em ms).
  */
-#define	MAX_REPORT_INTERVAL		30
+#define	MAX_REPORT_INTERVAL		30000
 
 /**\def DEFAULT_REPORT_INTERVAL
- * \brief Intervalo default entre reports de resultado (em s).
+ * \brief Intervalo default entre reports de resultado (em ms).
  */
-#define	DEFAULT_REPORT_INTERVAL	1
+#define	DEFAULT_REPORT_INTERVAL	10000
 
 /**\def MIN_BURST_SIZE
  * \brief Tamanho mínimo do burst de dados para teste (em MB).
@@ -176,6 +176,11 @@
  * \brief Buffer máximo de transmissão/recepção de dados.
  */
 #define	BUFFER_SIZE				2048
+
+/**\def STR_SIZE
+ * \brief Buffer máximo para strings de nome (hostname, interface...)
+ */
+#define	STR_SIZE				256
 
 /**\def MAX_PAYLOAD
  * \brief Tamanho máximo para payload dos pacotes de controle
@@ -260,6 +265,13 @@
  */
 #define RECVCAPTURE_TIMEOUT				1000
 
+/**\def u_long
+ * \brief Abreviação para unsigned long.
+ */
+#ifndef u_long
+typedef	unsigned long u_long;
+#endif
+
 /**\enum mode_type
  * \brief Enumeração para os modos de operação do UdpTester
  */
@@ -301,6 +313,7 @@ typedef enum {
 typedef enum {
 	RECEIVER_CONNECT = 0,		/**< Sinalização para conexão recebida. >*/
 	SENDER_CONNECT,				/**< Sinalização para conexão estabelecida com host remoto. >*/
+	SENDER_UDPCONNECT,			/**< Sinalização enviado pelo lado transmissor da conexão de controle. >*/
 	START_TEST_DOWN,			/**< Requisição para teste de download. >*/
 	FEEDBACK_START_TEST_DOWN,	/**< Confirmação para início de teste de download. >*/
 	FEEDBACK_TEST_DOWN,			/**< Relatório de teste de download. >*/
@@ -309,6 +322,18 @@ typedef enum {
 	FEEDBACK_TEST_UP,			/**< Relatório de teste de upload. >*/
 	LOOP_TEST_INTERVAL,			/**< Mensagem para inicio de intervalo entre testes. >*/
 } ctrlpacket_type;
+
+/**\struct timeval32
+ * \brief Estrutura de dados para substituição da struct timeval.
+ * 
+ *   A struct timeval utiliza o tipo long int, que apresenta tamanhos diferentes
+ * entre máquina 32 e 64bits, causando perda de informações durante a  troca  de
+ * pacotes.
+ */
+typedef struct {
+	int tv_sec;					/**< Porção do tempo em segundos. >*/
+	int tv_usec;				/**< Porção do tempo em microssegundos. >*/
+} timeval32;
 
 /**\struct ttype_cont
  * \brief Estrutura de dados com informações específicas para testes com tráfego
@@ -331,50 +356,63 @@ typedef struct {
 	int interval;					/**< Intervalo entre trens de pacotes. >*/
 } ttype_train;
 
+/**\struct resume
+ * \brief Relatório de teste udp (apenas resultados observados no receiver).
+ */
+typedef struct {
+	int packet_size;					/**< Tamanho médio dos pacotes recebido. >*/
+	int packet_num;						/**< Número de pacotes recebidos. >*/
+	int bytes;							/**< Número de bytes recebidos. >*/
+	int train_size;						/**< Tamanho médio dos trens de pacotes (número de pacotes). >*/
+	int train_num;						/**< Número de trens de pacotes. >*/
+	int train_interval;					/**< Intervalo entre trens de pacotes. >*/
+	timeval32 bw_med;					/**< Banda média calculada (em Mbps). >*/
+	timeval32 bw_max;					/**< Banda máxima calculada (em Mbps). >*/
+	timeval32 bw_min;					/**< Banda mínima calculada (em Mbps). >*/
+	int jitter_med;						/**< Jitter médio observado (em us). >*/
+	int jitter_max;						/**< Jitter máximo calculado (em us). >*/
+	int jitter_min;						/**< Jitter mínimo calculado (em us). >*/
+	timeval32 time_med;					/**< Tempo médio de teste (em s). >*/
+	timeval32 time_max;					/**< Tempo máximo de teste (em s). >*/
+	timeval32 time_min;					/**< Tempo mínimo de teste (em s). >*/
+	int loss_med;						/**< Número médio de pacotes perdidos. >*/
+	int loss_max;						/**< Número máximo de pacotes perdidos. >*/
+	int loss_min;						/**< Número mínimo de pacotes perdidos. >*/
+} resume;
+
 /**\struct report
  * \brief Relatório de teste udp.
  */
 typedef struct {
 	test_type t_type;					/**< Tipo de teste realizado. */
-	int packet_size;					/**< Tamanho médio do pacote recebido. >*/
-	int packet_num;						/**< Número de pacotes recebidos. >*/
-	int bytes;							/**< Número de byres recebidos. >*/
-	int train_size;						/**< Tamanho médio dos trens de pacotes (número de pacotes). >*/
-	int train_num;						/**< Número de trens de pacotes. >*/
-	int train_interval;					/**< Intervalo entre trens de pacotes. >*/
+	resume result;						/**< Resumo de resultados do teste. >*/
+	int udp_rate;						/**< Taxa de transmissão do teste (em Mpbs). >*/
 	int udp_port;						/**< Porta para teste UDP. >*/
-	struct timeval bw_med;				/**< Banda média calculada (em Mbps). >*/
-	struct timeval bw_max;				/**< Banda máxima calculada (em Mbps). >*/
-	struct timeval bw_min;				/**< Banda mínima calculada (em Mbps). >*/
-	int jitter_med;						/**< Jitter médio observado (em us). >*/
-	int jitter_max;						/**< Jitter máximo calculado (em us). >*/
-	int jitter_min;						/**< Jitter mínimo calculado (em us). >*/
-	struct timeval time_med;			/**< Tempo médio de teste (em s). >*/
-	struct timeval time_max;			/**< Tempo máximo de teste (em s). >*/
-	struct timeval time_min;			/**< Tempo mínimo de teste (em s). >*/
-	int lost_med;						/**< Número médio de pacotes perdidos. >*/
-	int lost_max;						/**< Número máximo de pacotes perdidos. >*/
-	int lost_min;						/**< Número mínimo de pacotes perdidos. >*/
+	int packet_size;					/**< Tamanho do pacote enviado no teste. >*/
+	union {
+		ttype_cont cont;				/**< Configurações específicas para teste com tráfego contínuo. >*/
+		ttype_train train;				/**< Configurações específicas para teste com tráfego de trem de pacotes. >*/
+	} test;
 } report;
 
 /**\struct ctrlpacket
  * \brief Estrutura para os pacotes de controle.
  */
 typedef struct {
-	ctrlpacket_type cp_type;		/**< Tipo de pacote de controle. >*/
-	test_type t_type;				/**< Tipo de teste (contínuo ou trem de pacotes). >*/
-	uint connected_address;			/**< Endereço do host remoto conectado ao server. >*/
-	int udp_port;					/**< Porta para teste UDP. >*/
-	int udp_rate;					/**< Taxa de transmissão do teste UDP (em Mbps). >*/
-	int packet_size;				/**< Tamanho do pacote para teste. >*/
-	int loop_interval;				/**< Intervalo entre testes. >*/
-	int sendsock_buffer;			/**< Tamanho do buffer do socket para envio do teste. >*/
-	int recvsock_buffer;			/**< Tamanho do buffer do socket para receber o teste. >*/
+	ctrlpacket_type cp_type;				/**< Tipo de pacote de controle. >*/
+	test_type t_type;						/**< Tipo de teste (contínuo ou trem de pacotes). >*/
+	struct sockaddr_in connected_address;	/**< Endereço do host remoto conectado ao server. >*/
+	int udp_port;							/**< Porta para teste UDP. >*/
+	int udp_rate;							/**< Taxa de transmissão do teste UDP (em Mbps). >*/
+	int packet_size;						/**< Tamanho do pacote para teste. >*/
+	int loop_interval;						/**< Intervalo entre testes. >*/
+	int sendsock_buffer;					/**< Tamanho do buffer do socket para envio do teste. >*/
+	int recvsock_buffer;					/**< Tamanho do buffer do socket para receber o teste. >*/
 	union {
-		ttype_cont cont;			/**< Configurações específicas para teste com tráfego contínuo. >*/
-		ttype_train train;			/**< Configurações específicas para teste com tráfego de trem de pacotes. >*/
+		ttype_cont cont;					/**< Configurações específicas para teste com tráfego contínuo. >*/
+		ttype_train train;					/**< Configurações específicas para teste com tráfego de trem de pacotes. >*/
 	} test;
-	char buffer[MAX_PAYLOAD];		/**< Payload para relatório do teste. >*/
+	char buffer[MAX_PAYLOAD];				/**< Payload para relatório do teste. >*/
 } ctrlpacket;
 
 /**\struct ctrl_pkt
@@ -382,7 +420,7 @@ typedef struct {
  */
 typedef struct {
 	char valid;							/**< Flag de validade da informação no pacote. >*/
-	ctrlpacket *data;					/**< Ponteiro para pacote de controle. >*/
+	ctrlpacket data;					/**< Ponteiro para pacote de controle. >*/
 } ctrl_pkt;
 
 /**\struct ctrl_queue
@@ -392,6 +430,7 @@ typedef struct {
 	short start;							/**< Indíce para o início da fila (inserção). >*/
 	short end;								/**< Indíce para o fim da fila (remoção). >*/
 	short size;								/**< Número de elementos válidos na fila. >*/
+	pthread_mutex_t mutex;					/**< Semáforo de controle de acesso. */
 	ctrl_pkt **queue;						/**< Ponteiro para pacote de controle. >*/
 } ctrl_queue;
 
@@ -408,6 +447,7 @@ typedef struct {
 	int loop_interval;				/**< Intervalo entre testes consecutivos. >*/
 	int sendsock_buffer;			/**< Tamanho do buffer do socket para envio do teste. >*/
 	int recvsock_buffer;			/**< Tamanho do buffer do socket para receber o teste. >*/
+	char iface[STR_SIZE];			/**< Interface para captura da transmissão de dados. */
 	union {
 		ttype_cont cont;			/**< Configurações específicas para teste com tráfego contínuo. >*/
 		ttype_train train;			/**< Configurações específicas para teste com tráfego de trem de pacotes. >*/
