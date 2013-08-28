@@ -88,3 +88,13 @@ int difftimeval2us(timeval32 *t1, timeval32 *t2) {
     return (int)((time_diff.tv_sec*1000000)+(time_diff.tv_usec)); 
 }
 
+int get_currentDateTime (char *buffer, int size) {
+	time_t now = time (0);
+	struct tm  tstruct;
+
+	tstruct = *localtime (&now);
+	strftime (buffer, size, "%Y-%m-%d.%X", &tstruct);
+
+	return 0;
+}
+

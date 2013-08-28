@@ -13,7 +13,7 @@ DIR_CTRL = $(DIR_MAIN)/ctrl
 DIR_MODULES = $(DIR_MAIN)/modules
 DIR_LIST= $(DIR_MAIN) $(DIR_TOOLS) $(DIR_THREADS) $(DIR_CTRL) $(DIR_MODULES)
 	
-CFLAGS:=-Wall -Werror \
+CFLAGS:=-Wall -Werror\
 	-I$(DIR_INCLUDE)
 
 CFLAGS+= -DDEBUG_LEVEL
@@ -21,8 +21,8 @@ CFLAGS+= -DDEBUG_LEVEL_DEFAULT=0
 	
 MAINOBJS=main.o
 TOOLSOBJS=parser.o tmath.o
-CTRLOBJS=ctrl.o
-THREADSOBJS=recvctrl_thread.o sendctrl_thread.o recvtest_thread.o sendtest_thread.o
+CTRLOBJS=ctrl.o recvctrl.o sendctrl.o
+THREADSOBJS=recvctrl_thread.o sendctrl_thread.o
 MODULESOBJS=continuo_burst.o
 
 COBJS=$(MAINOBJS) $(TOOLSOBJS) $(CTRLOBJS) $(THREADSOBJS) $(MODULESOBJS)

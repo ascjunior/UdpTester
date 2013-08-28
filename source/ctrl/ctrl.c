@@ -7,11 +7,11 @@
 
 #include <defines.h>
 #include <ctrl/ctrl.h>
+#include <ctrl/recvctrl.h>
+#include <ctrl/sendctrl.h>
 #include <tools/debug.h>
 #include <threads/recvctrl_thread.h>
 #include <threads/sendctrl_thread.h>
-#include <threads/recvtest_thread.h>
-#include <threads/sendtest_thread.h>
 
 #include <sys/time.h>
 #include <arpa/inet.h>
@@ -34,6 +34,8 @@ ctrlpacket *getnext_ctrlpacket (ctrl_queue *queue) {
 		pkt = pkt_queue[queue->end];
 		data = &(pkt->data);
 		pkt->valid = 0;
+
+		/* mensagens para depuração. */
 		DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "MSG TYPE %s\n",
 					(data->cp_type == RECEIVER_CONNECT) ? "RECEIVER_CONNECT" :
 					(data->cp_type == SENDER_CONNECT) ? "SENDER_CONNECT" :
@@ -44,6 +46,7 @@ ctrlpacket *getnext_ctrlpacket (ctrl_queue *queue) {
 					(data->cp_type == FEEDBACK_START_TEST_UP) ? "FEEDBACK_START_TEST_UP" :
 					(data->cp_type == FEEDBACK_TEST_UP) ? "FEEDBACK_TEST_UP" :
 					(data->cp_type == LOOP_TEST_INTERVAL) ? "LOOP_TEST_INTERVAL" : "UNKNOW");
+
 		pkt->valid = 0;
 		queue->end = (queue->end + 1) % MAX_CTRL_QUEUE;
 	}
@@ -79,43 +82,18 @@ int save_test_report (settings *conf_settings, ctrlpacket *data) {
 
 int start_sendctrl_connection (settings *conf_settings) {
 	int ret = 0;
+	
 	/* TODO: Verificar local melhor para id de threads, com configurações??? */
 	pthread_t sendctrl_thread_id;
+	pthread_attr_t attr;
+
+	pthread_attr_init (&attr);
+	pthread_attr_setdetachstate (&attr, PTHREAD_CREATE_DETACHED);
 
 	/* inicializa thread para enviar mensagens de controle */
-	if (pthread_create (&sendctrl_thread_id, NULL, sendctrl_thread, (void *)conf_settings)) {
+	if (pthread_create (&sendctrl_thread_id, &attr, sendctrl_thread, (void *)conf_settings)) {
 		DEBUG_LEVEL_MSG (DEBUG_LEVEL_LOW, "Could not sendctrl thread\n");
 		ret = -1;
-	}
-
-	return ret;
-}
-
-
-int start_sendtest_thread (settings *conf_settings) {
-	int ret = 0;
-	/* TODO: Verificar local melhor para id de threads, com configurações??? */
-	pthread_t sendtest_thread_id;
-
-	/* inicializa thread para enviar teste udp */
-	if ((ret = pthread_create (&sendtest_thread_id, NULL, sendtest_thread, (void *)conf_settings))) {
-		DEBUG_LEVEL_MSG (DEBUG_LEVEL_LOW, "Could not sendtest thread\n");
-		DEBUG_LEVEL_MSG (DEBUG_LEVEL_LOW, "Could not create sendtest thread: %s\n",
-						(ret == EAGAIN) ? "EAGAIN" : (ret == EINVAL) ? "EINVAL" : (ret == EPERM) ? "EPERM" : "UNKNOW");
-	}
-
-	return ret;
-}
-
-int start_recvtest_thread (settings *conf_settings) {
-	int ret = 0;
-	/* TODO: Verificar local melhor para id de threads, com configurações??? */
-	pthread_t recvtest_thread_id;
-
-	/* inicializa thread para receber teste udp */
-	if ((ret = pthread_create (&recvtest_thread_id, NULL, recvtest_thread, (void *)conf_settings))) {
-		DEBUG_LEVEL_MSG (DEBUG_LEVEL_LOW, "Could not create recvtest thread: %s\n",
-						(ret == EAGAIN) ? "EAGAIN" : (ret == EINVAL) ? "EINVAL" : (ret == EPERM) ? "EPERM" : "UNKNOW");
 	}
 
 	return ret;
@@ -125,9 +103,13 @@ int start_ctrl_connection (settings *conf_settings) {
 	int ret = 0;
 	/* TODO: Verificar local melhor para id de threads, com configurações??? */
 	pthread_t recvctrl_thread_id;
+	pthread_attr_t attr;
+
+	pthread_attr_init (&attr);
+	pthread_attr_setdetachstate (&attr, PTHREAD_CREATE_DETACHED);
 
 	/* inicializa thread para receber mensagens de controle */
-	if (pthread_create (&recvctrl_thread_id, NULL, recvctrl_thread, (void *)conf_settings)) {
+	if (pthread_create (&recvctrl_thread_id, &attr, recvctrl_thread, (void *)conf_settings)) {
 		DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "Could not create recvctrl thread\n");
 		ret = -1;
 	}
@@ -188,121 +170,49 @@ void loop_control (settings *conf_settings) {
 					conf_settings->test.cont.pkt_num = data->test.cont.pkt_num;
 					conf_settings->test.cont.interval = data->test.cont.interval;
 					conf_settings->test.cont.report_interval = data->test.cont.report_interval;
-					start_recvtest_thread (conf_settings);
 
-/*
-receiver:
-	mensagem enviada pelo server sinalizando inicio de teste de down
-		-- cria thread para receber teste (tipo de teste na mensagem???)
-			-- fim de teste:
-			-- cria relatório de teste
-			-- envia relatório de teste com mensagem do tipo feedback_test_down
-			-- envia mensagem de inicio de teste de up com tipo start_test_up
-		-- envia mensagem de feedback_start_test_down
-*/
-					pthread_mutex_lock (&(sendctrl_queue->mutex));
+					recvctrl (conf_settings);
 
-					ctrl_pkt **pkt_queue = sendctrl_queue->queue;
-					sendctrl_queue->start = (sendctrl_queue->start + 1) % MAX_CTRL_QUEUE;
-					pkt_queue[sendctrl_queue->start]->valid = 1;
-					data = &(pkt_queue[sendctrl_queue->start]->data);
-					data->cp_type = FEEDBACK_START_TEST_DOWN;
-					data->packet_size = sizeof(ctrlpacket);
-
-					pthread_mutex_unlock (&(sendctrl_queue->mutex));
 				}
 				break;
 			case FEEDBACK_START_TEST_DOWN:
 				if (conf_settings->mode == SENDER) {
 					DEBUG_LEVEL_MSG (DEBUG_LEVEL_LOW, "SEND TEST DOWN THREAD CREATED!!!\n");
-					start_sendtest_thread (conf_settings);
 
-/*
-sender:
-	cria thread para envio de teste de down
-receiver:
-	nada a fazer :(
-*/
+					sendctrl (conf_settings);
+
 				}
 				break;
 			case FEEDBACK_TEST_DOWN:
 				if (conf_settings->mode == SENDER) {
-					printf ("SAVED REPORT TEST DOWN!!!\n");
+					DEBUG_LEVEL_MSG (DEBUG_LEVEL_LOW, "SAVED REPORT TEST DOWN!!!\n");
+
 					save_test_report (conf_settings, data);
-/*
-sender:
-	armazena relatório de teste down (feedback do cliente, alterar probe em função dos resultados???)
-receiver:
-	nada a fazer :(
-*/
+
 				}
 				break;
 			case START_TEST_UP:
 				if (conf_settings->mode == SENDER) {
 					DEBUG_LEVEL_MSG (DEBUG_LEVEL_LOW, "RECV TEST UP THREAD CREATED!!\n");
-					start_recvtest_thread (conf_settings);
-/*
-sender:
-	cria thread para receber teste up (tipo de teste na mensagem???)
-		--fim de teste:
-		-- cria relatório de teste
-		-- envia relatório de teste com mensagem do tipo feedback_test_up
-		-- adiciona mensagem na lista de mensagem recebidas (workaround???) tipo loop_test_interval
-	envia feedback para inicio de teste de up, tipo feedback_start_test_up
-receiver:
-	nada a fazer :(
-*/
-					pthread_mutex_lock (&(sendctrl_queue->mutex));
 
-					ctrl_pkt **pkt_queue = sendctrl_queue->queue;
-					sendctrl_queue->start = (sendctrl_queue->start + 1) % MAX_CTRL_QUEUE;
-					pkt_queue[sendctrl_queue->start]->valid = 1;
-					data = &(pkt_queue[sendctrl_queue->start]->data);
-					data->cp_type = FEEDBACK_START_TEST_UP;
-					data->packet_size = sizeof(ctrlpacket);
+					recvctrl (conf_settings);
 
-					pthread_mutex_unlock (&(sendctrl_queue->mutex));
-				}
-				else {
-					pthread_mutex_lock (&(sendctrl_queue->mutex));
-
-					ctrl_pkt **pkt_queue = sendctrl_queue->queue;
-					sendctrl_queue->start = (sendctrl_queue->start + 1) % MAX_CTRL_QUEUE;
-					pkt_queue[sendctrl_queue->start]->valid = 1;
-					data = &(pkt_queue[sendctrl_queue->start]->data);
-					data->cp_type = START_TEST_UP;
-					data->packet_size = sizeof(ctrlpacket);
-
-					pthread_mutex_unlock (&(sendctrl_queue->mutex));
-					DEBUG_LEVEL_MSG (DEBUG_LEVEL_LOW, "SENDING TEST UP...!! -- statck %d\n", sendctrl_queue->start);
 				}
 				break;
 			case FEEDBACK_START_TEST_UP:
 				if (conf_settings->mode == RECEIVER) {
 					DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "SEND TEST UP THREAD CREATED!!\n");
-					start_sendtest_thread (conf_settings);
-/*
-sender:
-	nada a fazer :(
-receiver:
-	cria thread para envio de teste de up
-*/
+
+					sendctrl (conf_settings);
+
 				}
 				break;
 			case FEEDBACK_TEST_UP:
 				if (conf_settings->mode == RECEIVER) {
 					DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "SAVED REPORT TEST UP!!!\n");
+
 					save_test_report (conf_settings, data);
-/*
-sender:
-	nada a fazer :(
-receiver:
-	armazena relatório de teste up (feedback do server, alterar probe de teste???) 
-		--fim do loop de teste:
-			-- opção 1: não faz nada, espera loop no server para novo ciclo de teste down/up
-			-- opção 2: finaliza threads de recv/send mensagens
-			OBS: por enquanto... opção 1
-*/
+
 				}
 				break;
 			case LOOP_TEST_INTERVAL:
@@ -321,13 +231,7 @@ receiver:
 
 					pthread_mutex_unlock (&(recvctrl_queue->mutex));
 					DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "ADD MSG SENDER_CONNECT to RECV STACK!!\n");
-/*
-sender:
-	loop(test_interval)
-	envia mensagem de inicio de teste de down, tipo start_test_down (envio do tipo de teste, parametros...)
-receiver:
-	nada a fazer :(
-*/
+
 				}
 				break;
 			default:

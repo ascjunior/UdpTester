@@ -59,4 +59,13 @@ int difftimeval2us (timeval32 *t1, timeval32 *t2);
  */
 int double2timeval (double d, timeval32 *t);
 
+/**\fn int get_currentDateTime(char *buffer, int size)
+ * \brief Get para data/hora no formato YYYY-MM-DD.HH:MM:SS.
+ * 
+ * \param buffer Buffer que receberá a string de data/hora.
+ * \param size Tamanho do buffer.
+ * \return 0 em caso de sucesso, ~0 caso contrário.
+ */
+int get_currentDateTime(char *buffer, int size);
+
 #endif /* __TMATH_H__ */

@@ -12,45 +12,40 @@
 
 #include <defines.h>
 
-/**\fn int send_continuo_burst (int port, int soc_buffer_size, int send_rate, int burst_size, int packet_size, u_long addr, char *log_file)
- * \brief Envia teste udp de tráfego contínuo limitado em bytes.
+/**\fn void *send_continuo_burst (void *param)
+ * \brief Thread para envio de teste udp de tráfego contínuo limitado em bytes.
  * 
- * \param port Porta UDP para teste.
- * \param soc_buffer_size Tamanho do buffer de transmissão.
- * \param send_rate Taxa de transmissão do teste.
- * \param burst_size Tamanho em MB dos dados.
- * \param packet_size Tamanho do pacote para transmissão.
- * \param add Endereço IPv4.
- * \param log_file Arquivo para log de execução.
- * \return 0 em caso de sucesso, ~0 caso contrário.
+ * \param param Estrutura de dados com configurações do teste.
+ * \return NULL.
  */
-int send_continuo_burst (int port, int soc_buffer_size, int send_rate, int burst_size, int packet_size, u_long addr, char *log_file);
+void *send_continuo_burst (void *param);
 
-/**\fn int recv_continuo_burst (int port, int soc_buffer_size, int report_interval, char *device, char *log_file, resume *result)
- * \brief Recebe teste udp de tráfego contínuo limitado em bytes. Análise do  teste  é  realizada
- * através da libpcap.
+/**\fn void *recv_continuo_burst (void *param)
+ * \brief Thread para recepção de teste udp de tráfego contínuo limitado em bytes.
  * 
- * \param port Porta UDP para teste.
- * \param soc_buffer_size Tamanho do buffer de transmissão.
- * \param report_interval Intervalo de tempo para report de teste.
- * \param device Device que será observado no teste.
- * \param log_file Arquivo para log de execução.
- * \param result Estrutura de dados com resultados do teste.
- * \return
+ *   Análise do teste é realizada através da libpcap.
+ * 
+ * \param param Estrutura de dados com configurações e resultados do teste.
+ * \return NULL.
  */
-int recv_continuo_burst (int port, int soc_buffer_size, int report_interval, char *device, char *log_file, resume *result);
+void *recv_continuo_burst (void *param);
 
-/**\fn int recv2_continuo_burst (int port, int soc_buffer_size, int report_interval, char *device, char *log_file, resume *result)
- * \brief Recebe teste udp de tráfego contínuo limitado em bytes.
+/**\fn void *recv2_continuo_burst (void *param)
+ * \brief Thread para recepção de teste udp de tráfego contínuo limitado em bytes.
  * 
- * \param port Porta UDP para teste.
- * \param soc_buffer_size Tamanho do buffer de transmissão.
- * \param report_interval Intervalo de tempo para report de teste.
- * \param device Device que será observado no teste.
- * \param log_file Arquivo para log de execução.
- * \param result Estrutura de dados com resultados do teste.
- * \return
+ * 
+ * \param param Estrutura de dados com configurações e resultados do teste.
+ * \return NULL.
  */
-int recv2_continuo_burst (int port, int soc_buffer_size, int report_interval, char *device, char *log_file, resume *result);
+void *recv2_continuo_burst (void *param);
+
+/**\fn void *timeout_thread (void *param)
+ * \brief Thread para verificação de timeout na recepção de teste.
+ * 
+ * \param param Configurações, resultados e andamento do teste.
+ * \return NULL.
+ */
+void *timeout_thread (void *param);
+
 
 #endif /* __CONTINUO_BURST__ */

@@ -94,7 +94,6 @@ void *recvctrl_thread (void *param) {
 
 		pthread_mutex_unlock (&(recv_queue->mutex));
 		
-		DEBUG_LEVEL_MSG (DEBUG_LEVEL_LOW, "******Start recv ctrl loop thread to remote %s\n", inet_ntoa(dest.sin_addr));
 		while (1) {
 			if ((num = recv (client_fd, buffer, BUFFER_SIZE,0)) == -1) {
 				DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "Error in receiving message\n");

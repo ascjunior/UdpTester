@@ -512,3 +512,52 @@ ctrlpacket
 		udp_rate
 		...payload
 	loop_test_interval
+
+
+
+
+##############################################CORREÇÕES
+	1) OUTPUTS NÃO DEVEM ESTAR DENTRO DE THREADS...
+	2) THREADS NÃO DEVEM CRIAR THREADS...
+		start_recvtest_thread
+			a) cria thread de recv
+				received_probe
+				recv_continuo_burst (int port, int soc_buffer_size, int report_interval, char *device, char *log_file, resume *result)
+			b) envia feedback de inicio de teste
+				add pkt na send_queue
+			c) cria thread de timeout
+				received_probe
+			espera resposta (join) -- das duas threads, sincronização de variáveis start/stop...
+			loga resultado (print)
+				write file...
+			envia feedback de resultado de teste
+				add pkt report na send_queue
+			
+		start_sendctrl_connection
+			a) cria a thread de send
+				send_continuo_burst (conf_settings->udp_port,
+					conf_settings->sendsock_buffer, conf_settings->udp_rate,
+					conf_settings->test.cont.size, conf_settings->packet_size,
+					conf_settings->address.sin_addr.s_addr, NULL);
+				send_continuo_burst (int port, int soc_buffer_size, int send_rate, int burst_size, int packet_size, u_long addr, char *log_file)
+				interval_packet, packet_num
+
+			b) loga resultado
+
+2010 - An Overview of Quality of Experience Measurement Challenges for Video Applications in IP Networks
+
+2010 - A Quest for an Internet Video Quality-of-Experience Metric
+
+SIM 2010 - 165 - A Generic Quantitative Relationship between Quality of Experience and Quality of Service
+
+SIM 2011 - 41 - Measuring the Quality of Experience of HTTP Video Streaming
+
+2001 - 147 - Metrics for the internet age: Quality of experience and quality of business
+
+2007 - 39 - A Proposed Approach for Quality of Experience Assurance for IPTV
+
+SIM 2008 - 27  - Passive Estimation of Quality of Experience
+
+SIM 2010 - 45 - Quality of Experience from user and network perspectives
+
+2011 - 37 - A Generic Quantitative Relationship between Quality of Experience and Quality of Service
