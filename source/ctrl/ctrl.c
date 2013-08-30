@@ -55,6 +55,43 @@ ctrlpacket *getnext_ctrlpacket (ctrl_queue *queue) {
 	return data;
 }
 
+int get_next_test (settings *conf_settings) {
+	int ret = 0, count = MAX_CONFIG_TEST, index = 0;
+	list_test *ag_test = &(conf_settings->ag_test);
+	config_test *cfg_test = ag_test->cfg_test;
+
+	if (ag_test->size > 0) {
+		index = ag_test->next;
+
+		while ((cfg_test[index].t_type == UDP_INVALID) && (count > 0)) {
+			index = (index + 1) % MAX_CONFIG_TEST;
+			count--;
+		}
+		if (count < 0) {
+			ret = -1;
+		}
+		else {
+			ag_test->next = index;
+			conf_settings->t_type = cfg_test[index].t_type;
+			conf_settings->udp_rate = cfg_test[index].udp_rate;
+			switch (cfg_test[index].t_type) {
+				case UDP_CONTINUO:
+					conf_settings->test.cont = cfg_test[index].test.cont;
+					ag_test->next++;
+					break;
+				case UDP_PACKET_TRAIN:
+					conf_settings->test.train = cfg_test[index].test.train;
+					ag_test->next++;
+					break;
+				default:
+					DEBUG_LEVEL_MSG (DEBUG_LEVEL_LOW, "Invalid test type %d\n", cfg_test[index].t_type);
+			}
+		}
+	}
+
+	return ret;
+}
+
 int save_test_report (settings *conf_settings, ctrlpacket *data) {
 	int ret = 0;
 	report *pkt_report = (report *)data->buffer;
@@ -64,7 +101,7 @@ int save_test_report (settings *conf_settings, ctrlpacket *data) {
 	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "MODE: %s\n",
 		(conf_settings->mode == SENDER) ? "SENDER" : (conf_settings->mode == RECEIVER) ? "RECEIVER" : "UNKNOW");
 	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "TEST TYPE             : %s\n",
-		(data->t_type == UDP_CONTINUO) ? "CONTINUO" : (data->t_type == UDP_PACKET_TRAIN) ? "TRAIN" : "UNKNOW");
+		(pkt_report->t_type == UDP_CONTINUO) ? "CONTINUO" : (pkt_report->t_type == UDP_PACKET_TRAIN) ? "TRAIN" : "UNKNOW");
 	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "PACKET SIZE           : %d\n", result->packet_size);
 	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "PACKET NUM            : %d\n", result->packet_num);
 	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "TOTAL BYTES           : %d\n", result->bytes);
@@ -101,7 +138,6 @@ int start_sendctrl_connection (settings *conf_settings) {
 
 int start_ctrl_connection (settings *conf_settings) {
 	int ret = 0;
-	/* TODO: Verificar local melhor para id de threads, com configurações??? */
 	pthread_t recvctrl_thread_id;
 	pthread_attr_t attr;
 
@@ -134,13 +170,13 @@ void loop_control (settings *conf_settings) {
 			case RECEIVER_CONNECT:
 				if (conf_settings->mode == SENDER) {
 					/* send crtl msg connection */
-					DEBUG_LEVEL_MSG (DEBUG_LEVEL_LOW, "Get receiver connection, call start_sendctrl_connection %s\n", inet_ntoa(data->connected_address.sin_addr));
 					conf_settings->address.sin_addr.s_addr = data->connected_address.sin_addr.s_addr;
 					start_sendctrl_connection (conf_settings);
 				}
 				break;
 			case SENDER_CONNECT:
 				if (conf_settings->mode == SENDER) {
+					get_next_test (conf_settings);
 
 					pthread_mutex_lock (&(sendctrl_queue->mutex));
 
@@ -149,70 +185,71 @@ void loop_control (settings *conf_settings) {
 					pkt_queue[sendctrl_queue->start]->valid = 1;
 					data = &(pkt_queue[sendctrl_queue->start]->data);
 					data->cp_type = START_TEST_DOWN;
+					data->t_type = conf_settings->t_type;
 					data->packet_size = conf_settings->packet_size;
 					data->udp_rate = conf_settings->udp_rate;
 					data->udp_port = conf_settings->udp_port;
-					if (conf_settings->t_type == UDP_CONTINUO) { /* TODO: Outros testes... */
-						data->test.cont = conf_settings->test.cont;
+					switch (conf_settings->t_type) {
+						case UDP_CONTINUO:
+							if (conf_settings->test.cont.size > 0) {
+								conf_settings->test.cont.pkt_num = (conf_settings->test.cont.size * 1000000)/conf_settings->packet_size;
+								if (((conf_settings->test.cont.size * 1000000) % conf_settings->packet_size) > 0) {
+									conf_settings->test.cont.pkt_num++;
+								}
+							}
+							data->test.cont = conf_settings->test.cont;
+							break;
+						case UDP_PACKET_TRAIN:
+							data->test.train = conf_settings->test.train;
+							break;
+						default:
+							DEBUG_LEVEL_MSG (DEBUG_LEVEL_LOW, "Invalid test type %d\n", conf_settings->t_type);
 					}
 
 					pthread_mutex_unlock (&(sendctrl_queue->mutex));
-					DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "ADD MSG START_TEST_DOWN to SEND STACK!!\n");
 				}
 				break;
 			case START_TEST_DOWN:
 				if (conf_settings->mode == RECEIVER) {
-					DEBUG_LEVEL_MSG (DEBUG_LEVEL_LOW, "RECV TEST DOWN THREAD CREATED!!\n");
-					if (!(conf_settings->udp_rate))
-						conf_settings->udp_rate = data->udp_rate;
-					conf_settings->packet_size = data->packet_size;
-					conf_settings->test.cont.size = data->test.cont.size;
-					conf_settings->test.cont.pkt_num = data->test.cont.pkt_num;
-					conf_settings->test.cont.interval = data->test.cont.interval;
-					conf_settings->test.cont.report_interval = data->test.cont.report_interval;
-
+					conf_settings->udp_rate = data->udp_rate;
+					conf_settings->t_type = data->t_type;
+					switch (data->t_type) {
+						case UDP_CONTINUO:
+							conf_settings->test.cont =  data->test.cont;
+							break;
+						case UDP_PACKET_TRAIN:
+							conf_settings->test.train = data->test.train;
+							break;
+						default:
+							DEBUG_LEVEL_MSG (DEBUG_LEVEL_LOW, "Invalid test type %d\n", conf_settings->t_type);
+					}
 					recvctrl (conf_settings);
 
 				}
 				break;
 			case FEEDBACK_START_TEST_DOWN:
 				if (conf_settings->mode == SENDER) {
-					DEBUG_LEVEL_MSG (DEBUG_LEVEL_LOW, "SEND TEST DOWN THREAD CREATED!!!\n");
-
 					sendctrl (conf_settings);
-
 				}
 				break;
 			case FEEDBACK_TEST_DOWN:
 				if (conf_settings->mode == SENDER) {
-					DEBUG_LEVEL_MSG (DEBUG_LEVEL_LOW, "SAVED REPORT TEST DOWN!!!\n");
-
 					save_test_report (conf_settings, data);
-
 				}
 				break;
 			case START_TEST_UP:
 				if (conf_settings->mode == SENDER) {
-					DEBUG_LEVEL_MSG (DEBUG_LEVEL_LOW, "RECV TEST UP THREAD CREATED!!\n");
-
 					recvctrl (conf_settings);
-
 				}
 				break;
 			case FEEDBACK_START_TEST_UP:
 				if (conf_settings->mode == RECEIVER) {
-					DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "SEND TEST UP THREAD CREATED!!\n");
-
 					sendctrl (conf_settings);
-
 				}
 				break;
 			case FEEDBACK_TEST_UP:
 				if (conf_settings->mode == RECEIVER) {
-					DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "SAVED REPORT TEST UP!!!\n");
-
 					save_test_report (conf_settings, data);
-
 				}
 				break;
 			case LOOP_TEST_INTERVAL:
@@ -230,12 +267,10 @@ void loop_control (settings *conf_settings) {
 					data->packet_size = sizeof(ctrlpacket);
 
 					pthread_mutex_unlock (&(recvctrl_queue->mutex));
-					DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "ADD MSG SENDER_CONNECT to RECV STACK!!\n");
-
 				}
 				break;
 			default:
-				printf("WARNING: DEFAULT CASE ACTION!!!!\n");
+				DEBUG_LEVEL_MSG (DEBUG_LEVEL_LOW, "WARNING: DEFAULT CASE ACTION!!!!\n");
 				return;
 		}
 	}

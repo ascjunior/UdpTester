@@ -195,7 +195,7 @@
 /**\def MAX_PACKET_PROBES
  * \brief Número máximo de pacotes em todas as probes.
  */
-#define MAX_PACKET_PROBES					(MAX_TRAIN_NUM * MAX_TRAIN_SIZE)+11 	/* #trens x #pacotes + 10 pacotes de fim de probe */
+#define MAX_PACKET_PROBES					(MAX_TRAIN_NUM * MAX_TRAIN_SIZE)+101 	/* #trens x #pacotes + 100 pacotes de fim de probe */
 
 /**\def WMEM_SOCKET_FILE
  * \brief Path para arquivo de configuração do buffer de transmissão do socket.
@@ -255,6 +255,18 @@
  */
 #define	DEFAULT_RECVCONT_BURST_LOGFILE		"UdpTester_RecvUDPContBytes.txt"
 
+/**\def DEFAULT_SENDCONT_BURST_LOGFILE
+ * \brief Arquivo default para log da transmissão  de  teste  contínuo udp  com
+ * limite em bytes.
+ */
+#define	DEFAULT_SENDTRAIN_BURST_LOGFILE		"UdpTester_SendUDPTrainBytes.txt"
+
+/**\def DEFAULT_RECVCONT_BURST_LOGFILE
+ * \brief Arquivo default para log da recepção de teste contínuo udp  com limite
+ * em bytes.
+ */
+#define	DEFAULT_RECVTRAIN_BURST_LOGFILE		"UdpTester_RecvUDPTrainBytes.txt"
+
 /**def DEFAULT_INTERFACE_NAME
  * \brief Interface default para observação em teste udp contínuo.
  */
@@ -264,6 +276,11 @@
  * \brief Timeout default para captura de teste udp contínuo (em ms).
  */
 #define RECVCAPTURE_TIMEOUT					1000
+
+/**\def MAX_CONFIG_TEST
+ * \brief Número máximo de testes sequencias configurados através de arquivos.
+ */
+#define MAX_CONFIG_TEST						10
 
 /**\def u_long
  * \brief Abreviação para unsigned long.
@@ -305,6 +322,7 @@ typedef struct {
 typedef enum {
 	UDP_CONTINUO = 0,						/**< Teste UDP com tráfego contínuo. >*/
 	UDP_PACKET_TRAIN,						/**< Teste UDP com trem de pacotes. >*/
+	UDP_INVALID,							/**< Sinalização de teste inválido, deve sempre ser o último. >*/
 } test_type;
 
 /**\enum ctrlpacket_type
@@ -434,6 +452,25 @@ typedef struct {
 	ctrl_pkt **queue;						/**< Ponteiro para pacote de controle. >*/
 } ctrl_queue;
 
+/**\struct config_test
+ * \brief Configurações de teste obtidas de aquivo de entrada.
+ */
+typedef struct {
+	test_type t_type;						/**< Tipo de teste (contínuo ou trem de pacotes). >*/
+	int udp_port;							/**< Porta para tráfego de dados. >*/
+	int udp_rate;							/**< Bandwidth para trasmissão em Mbps. >*/
+	union {
+		ttype_cont cont;					/**< Configurações específicas para teste com tráfego contínuo. >*/
+		ttype_train train;					/**< Configurações específicas para teste com tráfego de trem de pacotes. >*/
+	} test;
+} config_test;
+
+typedef struct {
+	int size;								/**< Número de testes na lista. >*/
+	int next;								/**< Indice do próximo teste a executar. >*/
+	config_test cfg_test[MAX_CONFIG_TEST];	/**< Lista de configurações de teste. >*/
+} list_test;
+
 /**\struct settings
  * \brief Lista de configurações do UdpTester.
  */
@@ -454,6 +491,7 @@ typedef struct {
 	} test;
 	ctrl_queue recv_queue;					/**< Fila de pacotes de controle recebidos. >*/
 	ctrl_queue send_queue;					/**< Fila de pacotes de controle para envio. >*/
+	list_test ag_test;						/**< Agenda de testes obtida de arquivo de configuração. >*/
 } settings;
 
 /**\struct packet_probe
@@ -461,8 +499,10 @@ typedef struct {
  */
 typedef struct {
 	short packet_id;						/**< Número identificador do pacote. >*/
+	short train_id;							/**< Número identificador do trem (apenas para trens de pacotes). >*/
 	short packet_total;						/**< Total de pacotes transmitidos. >*/
 	short burst_size;						/**< Total de bytes transmitidos. >*/
+	short train_num;						/**< Número de trens de pacotes. >*/
 	short send_rate;						/**< Taxa de transmissão. >*/
 	short packet_size;						/**< Tamanho do pacotes. >*/
 } packet_probe;
@@ -483,12 +523,6 @@ typedef struct {
 	int mreceived_total;					/**< Total de bytes recebidos na parte final do teste (1/2, 2/3...). >*/
 	int mreceived_packets;					/**< Total de pacotes recebidos na parte final do teste (1/2, 2/3...).. >*/
 	timeval32 mstart;						/**< Instante de tempo do primeiro pacote recebido (parte final do teste). >*/
-#endif
-#ifdef CALC_JITTER
-	timeval32 tlast;						/**< Instante de tempo de chegada do pacote anterior. >*/
-	double min_jitter;						/**< Jitter mínimo. >*/
-	double max_jitter;						/**< Jitter máximo. >*/
-	double med_jitter;						/**< Jitter médio. >*/
 #endif
 	char *log_file;							/**< Arquivo para log de execução do teste. >*/
 } received_probe;

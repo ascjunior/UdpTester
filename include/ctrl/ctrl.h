@@ -26,6 +26,14 @@ int start_ctrl_connection (settings *conf_settings);
  */
 ctrlpacket *getnext_ctrlpacket (ctrl_queue *queue);
 
+/**\fn int get_next_test (settings *conf_settings)
+ * \brief Get para o próximo teste.
+ * 
+ * \param conf_settings Configurações de controle do teste.
+ * \return 0 em caso de sucesso, ~0 caso contrário.
+ */
+int get_next_test (settings *conf_settings);
+
 /**\fn int save_test_report (settings *conf_settings, ctrlpacket *data)
  * \brief Método save para relatório de teste.
  * 

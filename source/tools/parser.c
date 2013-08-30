@@ -11,6 +11,7 @@
 
 #include <defines.h>
 #include <tools/parser.h>
+#include <tools/debug.h>
 
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -43,6 +44,23 @@ const char short_options[] = "b:i:h:l:n:p:r:s:t:v:B:I:L:R:S:";
 * 
 */
 
+/**\fn int read_config_file (char *argv, settings *conf_settings)
+ * \brief Realiza o parser do arquivo de configurações de teste.
+ * 
+ *    O arquivo de configuração  de  testes  permite especificar  uma  lista  de
+ * testes sequencias com diferentes perfis.
+ *    O arquivo deve seguir o seguinte template:
+ *    TIPO RATE <configs>
+ *    Tipos de testes aceitos:
+ *      0 - UDP continuo, com as seguintes configurações: SIZE(MB) TIME(ms) REPORT(ms)
+ *      1 - UDP trem de pacotes, com as seguintes configurações: #TRAIN(int) SIZE(int) INTERVAL(ms) 
+ * 
+ * \param fname Path para o arquivo de configurações.
+ * \param conf_settings Estrutura de dados com configurações de teste.
+ * \return 0 em caso de sucesso, ~0 caso contrário.
+ */
+int read_config_file (char *fname, settings *conf_settings);
+
 void usage(void) {
 	printf("\nUsage: ./UdpTester [-S, --sender |-R, --receiver server_addr] [options]"
 		   "\nTry `./UdpTester --help' for more information.\n\n");
@@ -65,9 +83,10 @@ void help(void) {
 		   "\n -n, --train_num <size>                  Number of train probes (min %d, max %d, default %d probes)"
 		   "\n -i, --train_interval <time>             Interval time between probes trains of packets (min  %d, max %d, default %d miliseconds)"
 		   "\n -I, --test_interval <time>              Interval to continuo test (min  %d, max %d, default %d miliseconds)"
-		   "\n -L, --length_test <size>                Quantidade de dados a transmitir (min  %d, max %d, default %d MB)"
+		   "\n -L, --length_test <size>                Burst size to test (min  %d, max %d, default %d MB)"
 		   "\n -l, --loop_test_interval <time>         Interval between tests (min  %d, max %d, default %d minutes)"
-		   "\n -b, --rate <value>                      Bandwidth (min  %d, max %d, default %d Mbps)\n\n",
+		   "\n -b, --rate <value>                      Bandwidth (min  %d, max %d, default %d Mbps)\n\n"
+		   "\n -f, --file <path>                       Test file configuration\n\n",
 		   MIN_PACKET_SIZE, MAX_PACKET_SIZE, DEFAULT_PACKET_SIZE,
 		   MIN_TRAIN_SIZE, MAX_TRAIN_SIZE, DEFAULT_TRAIN_SIZE,
 		   MIN_TRAIN_NUM, MAX_TRAIN_NUM, DEFAULT_TRAIN_NUM,
@@ -79,6 +98,8 @@ void help(void) {
 }
 
 void init_settings (settings *conf_settings) {
+	int i = 0;
+	list_test *ag_test = &(conf_settings->ag_test);
 
 	memset(conf_settings, 0, sizeof (settings));
 	conf_settings->mode = RECEIVER;
@@ -93,6 +114,11 @@ void init_settings (settings *conf_settings) {
 	conf_settings->recvsock_buffer = DEFAULT_SOC_BUFFER;
 	conf_settings->sendsock_buffer = DEFAULT_SOC_BUFFER;
 	conf_settings->udp_port = DEFAULT_DATA_PORT;
+	ag_test->size = 0;
+	ag_test->next = 0;
+	memset (ag_test->cfg_test, 0, (sizeof (config_test) * MAX_CONFIG_TEST));
+	for (i = 0; i < MAX_CONFIG_TEST; i++)
+		ag_test->cfg_test[i].t_type = UDP_INVALID;
 	memset (conf_settings->iface, 0, STR_SIZE);
 	memcpy (conf_settings->iface, DEFAULT_INTERFACE_NAME, strlen(DEFAULT_INTERFACE_NAME));
 }
@@ -128,6 +154,15 @@ int parse_command_line (int argc, char **argv, settings *conf_settings) {
 					}
 					memset (conf_settings->iface, 0, STR_SIZE);
 					memcpy (conf_settings->iface, argv[i], strlen(argv[i]));
+					break;
+				case 'f':
+					i++;
+					if (strlen(argv[i]) <= 0) {
+						return -1;
+					}
+					else {
+						read_config_file (argv[i], conf_settings);
+					}
 					break;
 				case 'i':
 					i++;
@@ -248,6 +283,48 @@ int parse_command_line (int argc, char **argv, settings *conf_settings) {
 	}
 	else {
 		ret = -1;
+	}
+
+	return ret;
+}
+
+int read_config_file (char *argv, settings *conf_settings) {
+	int ret = 0, count = 0;
+	int config[5];
+	list_test *ag_test = &(conf_settings->ag_test);
+	config_test *cfg_test = ag_test->cfg_test;
+	FILE *fp;
+
+	if ((argv == NULL) || (strlen (argv) <= 0))
+		return -1;
+
+	memset (&config, 0, (sizeof (int) * 5));
+	fp = fopen (argv, "r");
+	if (fp != NULL) {
+		while (((fscanf (fp, "%d\t%d\t%d\t%d\t%d\n", &config[0],
+				&config[1], &config[2], &config[3], &config[4])) == 5)
+				&& (count < MAX_CONFIG_TEST)) {
+			switch (config[0]) {
+				case UDP_CONTINUO:
+					cfg_test[count].test.cont.size = config[2];
+					cfg_test[count].test.cont.interval = config[3];
+					cfg_test[count].test.cont.report_interval = config[4];
+					break;
+				case UDP_PACKET_TRAIN:
+					cfg_test[count].test.train.num = config[2];
+					cfg_test[count].test.train.size = config[3];
+					cfg_test[count].test.train.interval = config[4];				
+					break;
+				default:
+					DEBUG_LEVEL_MSG (DEBUG_LEVEL_LOW, "Invalid test type %d\n", config[0]);
+					return -1;
+			}
+			cfg_test[count].t_type = config[0];
+			cfg_test[count].udp_rate = config[1];
+			ag_test->size++;
+			count++;
+		}
+		fclose (fp);
 	}
 
 	return ret;

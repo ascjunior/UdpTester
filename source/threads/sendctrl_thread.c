@@ -42,8 +42,6 @@ void *sendctrl_thread (void *param) {
     struct sockaddr_in server_info;
     int sockfd;
 
-	DEBUG_LEVEL_MSG (DEBUG_LEVEL_LOW, "***Starting send ctrl thread...\n");
-
 	if ((sockfd = socket(AF_INET, SOCK_STREAM, 0))== -1) {
 		DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "Could create socket\n");
 		exit (1);
@@ -51,18 +49,20 @@ void *sendctrl_thread (void *param) {
 
 	memset (&server_info, 0, sizeof(server_info));
 	server_info.sin_family = AF_INET;
-	if (conf_settings->mode == RECEIVER)
+	if (conf_settings->mode == RECEIVER) {
 		server_info.sin_port = htons(SEND_PORT);
-	else
+	}
+	else {
 		server_info.sin_port = htons(RECV_PORT);
+	}
 	server_info.sin_addr = conf_settings->address.sin_addr;
+
 	if (connect (sockfd, (struct sockaddr *)&server_info, sizeof(struct sockaddr)) < 0) {
-		DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "Connection Failure\n");
+		DEBUG_LEVEL_MSG (DEBUG_LEVEL_LOW, "Connection Failure\n");
 		exit (1);
 	}
 	else {
 		/* sinalizar na fila de mensagens recebidas que a conexão foi estabelecida */
-		DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "Connection Established\n");
 		pthread_mutex_lock (&(recv_queue->mutex));
 
 		pkt_queue = recv_queue->queue;
@@ -75,7 +75,6 @@ void *sendctrl_thread (void *param) {
 		pthread_mutex_unlock (&(recv_queue->mutex));
 	}
 
-	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "******Starting send ctrl loop...\n");
 	while (1) {
 
 		pthread_mutex_lock (&(send_queue->mutex));
@@ -86,7 +85,7 @@ void *sendctrl_thread (void *param) {
 			pkt = pkt_queue[send_queue->end];
 			data = &(pkt->data);
 			if ((send (sockfd, data, data->packet_size,0)) == -1) {
-				DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "Failure Sending Message\n");
+				DEBUG_LEVEL_MSG (DEBUG_LEVEL_LOW, "Failure Sending Message\n");
 				continue;
 			}
 
@@ -114,10 +113,8 @@ void *sendctrlUDP_thread (void *param) {
 	struct sockaddr *sock_server_info = (struct sockaddr *)&server_info;
     int sockfd, resize_buffer = DEFAULT_SOC_BUFFER, slen = sizeof (server_info);
 
-	DEBUG_LEVEL_MSG (DEBUG_LEVEL_LOW, "Starting send ctrl udp thread...\n");
-
 	if ((sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP))== -1) {
-		DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "Could create socket\n");
+		DEBUG_LEVEL_MSG (DEBUG_LEVEL_LOW, "Could create socket\n");
 		exit (1);
 	}
 
@@ -130,17 +127,16 @@ void *sendctrlUDP_thread (void *param) {
 		server_info.sin_port = htons(RECV_PORT);
 
 	if (setsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, (const void *)&resize_buffer, sizeof(resize_buffer)) != 0) {
-		DEBUG_MSG (DEBUG_LEVEL_HIGH, "Could not resize send socket buffers!!\n");
+		DEBUG_MSG (DEBUG_LEVEL_LOW, "Could not resize send socket buffers!!\n");
 		exit(1);
 	}
 
 	if ((bind (sockfd, (const struct sockaddr *)&server_info, sizeof(server_info))) == -1) {
-		DEBUG_MSG(DEBUG_LEVEL_LOW, "Could not bind!!\n");
+		DEBUG_MSG (DEBUG_LEVEL_LOW, "Could not bind!!\n");
 		exit(1);
 	}
 	else {
 		/* sinalizar na fila de mensagens recebidas que a conexão foi estabelecida */
-		DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "Connection Established\n");
 		pkt_queue = recv_queue->queue;
 
 		pthread_mutex_lock (&(recv_queue->mutex));
@@ -152,21 +148,18 @@ void *sendctrlUDP_thread (void *param) {
 		data->packet_size = sizeof(ctrlpacket);
 
 		pthread_mutex_unlock (&(recv_queue->mutex));
-		DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "ADD MSG SENDER_CONNECT to RECV MSG STACK %d\n", recv_queue->start);
 	}
 
-	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "Starting send ctrl loop...\n");
 	while (1) {
 		pthread_mutex_lock (&(send_queue->mutex));
 
 		pkt_queue = send_queue->queue;
 		if (pkt_queue[send_queue->end]->valid) {
-			LOG_FILE (DEFAULT_SENDCONT_BURST_LOGFILE, "Sending Message at send_queue->queue[%d]\n", send_queue->end);
 			
 			pkt = pkt_queue[send_queue->end];
 			data = &(pkt->data);
 			if ((sendto (sockfd, data, data->packet_size, 0, sock_server_info, slen)) == -1) {
-				DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "Failure Sending Message\n");
+				DEBUG_LEVEL_MSG (DEBUG_LEVEL_LOW, "Failure Sending Message\n");
 				continue;
 			}
 

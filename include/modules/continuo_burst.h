@@ -47,5 +47,13 @@ void *recv2_continuo_burst (void *param);
  */
 void *timeout_thread (void *param);
 
+/**\fn void print_result (settings *conf_settings, received_probe *probe, int ended)
+ * \brief Imprime o resultado atual do teste.
+ * 
+ * \param conf_settings Configurações de teste.
+ * \param probe Estrutura de dados com as informações do teste.
+ * \param ended Flag que sinaliza fim de teste.
+ */
+void print_result (settings *conf_settings, received_probe *probe, resume *result);
 
 #endif /* __CONTINUO_BURST__ */

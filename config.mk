@@ -23,7 +23,7 @@ MAINOBJS=main.o
 TOOLSOBJS=parser.o tmath.o
 CTRLOBJS=ctrl.o recvctrl.o sendctrl.o
 THREADSOBJS=recvctrl_thread.o sendctrl_thread.o
-MODULESOBJS=continuo_burst.o
+MODULESOBJS=continuo_burst.o packet_train.o
 
 COBJS=$(MAINOBJS) $(TOOLSOBJS) $(CTRLOBJS) $(THREADSOBJS) $(MODULESOBJS)
 

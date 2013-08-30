@@ -64,6 +64,7 @@ int main (int argc, char **argv) {
 	conf_settings.recv_queue.end = 0;
 	pthread_mutex_init (&(conf_settings.recv_queue.mutex), NULL);
 	
+/*
 	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "settings:\n");
 	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "settings->mode: %s\n",
 			(conf_settings.mode == SENDER) ? "SENDER" : (conf_settings.mode == RECEIVER) ? "RECEIVER" : "UNKNOW");
@@ -71,8 +72,9 @@ int main (int argc, char **argv) {
 	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "settings->packet_size: %dbytes\n", conf_settings.packet_size);
 	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "settings_>interval: %ds\n", conf_settings.loop_interval);
 	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "settings->address: %s\n", inet_ntoa(conf_settings.address.sin_addr));
-
 	DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "CALL start_ctrl_connection \n");
+*/
+
 	start_ctrl_connection (&conf_settings);
 
 	while (1) {

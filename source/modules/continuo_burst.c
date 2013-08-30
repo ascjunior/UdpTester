@@ -95,7 +95,7 @@ void *send_continuo_burst (void *param) {
 	sender_addr_in->sin_addr.s_addr = conf_settings->address.sin_addr.s_addr;
 
 	if (setsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, (const void *)&resize_buffer, sizeof(resize_buffer)) != 0) {
-		DEBUG_MSG (DEBUG_LEVEL_HIGH, "Could not resize send socket buffers!!\n");
+		DEBUG_MSG (DEBUG_LEVEL_LOW, "Could not resize send socket buffers!!\n");
 		return NULL;
 	}
 
@@ -104,8 +104,8 @@ void *send_continuo_burst (void *param) {
 		return NULL;
 	}
 
-	memset(buffer, 'B', BUFFER_SIZE);
-	gettimeofday(&time_next, NULL);
+	memset (buffer, 'B', BUFFER_SIZE);
+	gettimeofday (&time_next, NULL);
 
 	packet = (packet_probe *)buffer;
 	packet->packet_id = 0;
@@ -120,23 +120,23 @@ void *send_continuo_burst (void *param) {
 		if (interval_packet > 0)
 			WHILE_DELAY_LOOP(time_next, interval_packet);
 		if (sendto(sockfd, buffer, p_size, 0, &sender_addr, slen) == -1) {
-			DEBUG_MSG (DEBUG_LEVEL_HIGH, "Could not send packet number %d", i+1);
+			DEBUG_MSG (DEBUG_LEVEL_LOW, "Could not send packet number %d", i+1);
 			continue;
 		}
 	}
 
 	/* sending end test */
-	memset(buffer, 'B', BUFFER_SIZE);
+	memset (buffer, 'B', BUFFER_SIZE);
 	packet = (packet_probe *)buffer;
 	packet->packet_id = PACKET_END_TEST;
 	packet->packet_total = NPACKET_END_TEST;
 
 	for (i = 0; i < NPACKET_END_TEST; i++) {
 		if (sendto (sockfd, buffer, p_size, 0, &sender_addr, slen) == -1) {
-			DEBUG_MSG (DEBUG_LEVEL_HIGH, "Could not send packet number %d", i+1);
+			DEBUG_MSG (DEBUG_LEVEL_LOW, "Could not send packet number %d", i+1);
 			continue;
 		}
-		usleep(100);
+		usleep (100);
 	}
 
 	close (sockfd);
@@ -147,7 +147,9 @@ void *send_continuo_burst (void *param) {
 
 void *recv_continuo_burst (void *param) {
 	data_test *data = (data_test *)param;
+	received_probe *recv_probe = &(data->probe[0]);
 	settings *conf_settings = data->conf_settings;
+	resume *result = data->result;
 	int sockfd = -1, resize_buffer = DEFAULT_SOC_BUFFER, yes = 1;
 	struct sockaddr receiver_addr;
 	struct sockaddr_in *receiver_addr_in = (struct sockaddr_in *)&receiver_addr;
@@ -168,7 +170,7 @@ void *recv_continuo_burst (void *param) {
 	if (strlen(conf_settings->iface)) {
 		if (pcap_lookupnet(conf_settings->iface, &netp, &maskp, errbuf)) {
 			DEBUG_MSG (DEBUG_LEVEL_LOW, "Get Device %s error: %s\n", conf_settings->iface, errbuf);
-			exit(1);					
+			return NULL;
 		}
 		else {
 			memset (dev, 0, BUFFER_SIZE);
@@ -179,7 +181,7 @@ void *recv_continuo_burst (void *param) {
 	resize_buffer = conf_settings->recvsock_buffer * 1024;
 	if (resize_socket_buffer (resize_buffer)) {
 		DEBUG_MSG (DEBUG_LEVEL_LOW, "Could not resize socket buffers!!\n");
-		exit(1);
+		return NULL;
 	}
 
 	sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
@@ -190,17 +192,17 @@ void *recv_continuo_burst (void *param) {
 
 	if (setsockopt (sockfd, SOL_SOCKET, SO_RCVBUF, (const void *)&resize_buffer, sizeof(resize_buffer)) != 0) {
 		DEBUG_MSG (DEBUG_LEVEL_LOW, "Could not resize receive socket buffers!!\n");
-		exit(1);
+		return NULL;
 	}
 
 	if (setsockopt (sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
 		DEBUG_LEVEL_MSG (DEBUG_LEVEL_LOW, "Could not set socket\n");
-		exit(1);
+		return NULL;
 	}
 
 	if (bind(sockfd, (const struct sockaddr *)&receiver_addr, sizeof(receiver_addr))==-1) {
 		DEBUG_LEVEL_MSG (DEBUG_LEVEL_LOW, "Could not bind!!\n");
-		exit(1);
+		return NULL;
 	}
 
 	/* libpcap filter! */
@@ -210,20 +212,20 @@ void *recv_continuo_burst (void *param) {
 	descr = pcap_open_live (dev, BUFSIZ, 1, 0, errbuf); 
 	if(descr == NULL) {
 		DEBUG_MSG(DEBUG_LEVEL_LOW, "pcap_open_live(): %s\n", errbuf);
-		exit (1);
+		return NULL;
 	}
 	data->handle = (void *)descr;
  
 	/* Now we'll compile the filter expression*/
 	if (pcap_compile (descr, &fp, expr, 0, netp) == -1) {
 		DEBUG_MSG(DEBUG_LEVEL_LOW, "Error calling pcap_compile\n");
-		exit (1);
+		return NULL;
 	} 
 
 	/* set the filter */
 	if (pcap_setfilter (descr, &fp) == -1) {
 		DEBUG_MSG(DEBUG_LEVEL_LOW, "Error setting filter\n");
-		exit(1);
+		return NULL;
 	}
 	
 	/* loop for callback function */
@@ -232,12 +234,14 @@ void *recv_continuo_burst (void *param) {
 	close(sockfd);
 	pcap_close (descr);
 
+	result->loss_med = conf_settings->test.cont.pkt_num - recv_probe->received_packets;
+
 	return NULL;
 }
 
 void *recv2_continuo_burst (void *param) {
 	data_test *data = (data_test *)param;
-	received_probe *recv_probe = data->probe;
+	received_probe *recv_probe = &(data->probe[0]);
 	settings *conf_settings = data->conf_settings;
 	resume *result = data->result;
 	int sockfd = -1, resize_buffer = DEFAULT_SOC_BUFFER, yes = 1, received = 0;
@@ -268,7 +272,7 @@ void *recv2_continuo_burst (void *param) {
 
 	if (setsockopt (sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
 		DEBUG_LEVEL_MSG (DEBUG_LEVEL_LOW, "Could not set socket\n");
-		exit(1);
+		return NULL;
 	}
 
 	if (bind(sockfd, (const struct sockaddr *)&receiver_addr, sizeof(receiver_addr))==-1) {
@@ -277,9 +281,9 @@ void *recv2_continuo_burst (void *param) {
 	}
 
 	memset (recv_probe, 0, sizeof(received_probe));
-	memset (buffer, 0, BUFFER_SIZE);
 
 	while (!recv_probe->stop_recv) {
+		memset (buffer, 0, BUFFER_SIZE);
 		received = recvfrom(sockfd, pkt, BUFFER_SIZE, 0, NULL, NULL);
 		ioctl(sockfd, SIOCGSTAMP, &tm_now);
 		tm32_now.tv_sec = tm_now.tv_sec;
@@ -321,6 +325,8 @@ void *recv2_continuo_burst (void *param) {
 
 	close (sockfd);
 
+	result->loss_med = conf_settings->test.cont.pkt_num - recv_probe->received_packets;
+
 	return NULL;
 }
 
@@ -328,7 +334,7 @@ void process_packet (u_char *arg, const struct pcap_pkthdr* pkthdr, const u_char
 	packet_probe *pkt;
 	data_test *data = (data_test *)arg;
 	settings *conf_settings = data->conf_settings;
-	received_probe *recv_probe = data->probe;
+	received_probe *recv_probe = &(data->probe[0]);
 	resume *result = data->result;
 	timeval32 tm32_now;
 	int jitter = 0;
@@ -382,7 +388,7 @@ void process_packet (u_char *arg, const struct pcap_pkthdr* pkthdr, const u_char
 
 void *timeout_thread (void *param) {
 	data_test *data = (data_test *)param;
-	received_probe *recv_probe = data->probe;
+	received_probe *recv_probe = &(data->probe[0]);
 	int recv_packets = -1;
 	struct timeval tm_now;
 	timeval32 tm32_now, tm_timeout;
@@ -416,6 +422,42 @@ void *timeout_thread (void *param) {
 	}
 	
 	return NULL;
+}
+
+void print_result (settings *conf_settings, received_probe *probe , resume *result) {
+	double bandwidth = 0.0, diff = 0.0;
+	char buffer[256];
+	char *log_file = probe->log_file;
+
+	if (!probe)
+		return;
+
+	diff = difftimeval2db(&(probe->start), &(probe->end));
+	if ((probe->received_total > 0) &&
+		(probe->received_packets > 0) && (diff > 0.0)) {
+		
+		bandwidth = (double)(probe->received_total*8)/diff;
+
+		result->packet_size = probe->received_total/probe->received_packets;
+		result->packet_num = probe->received_packets;
+		result->bytes = probe->received_total;
+		/* double to timeval....*/
+		double2timeval(bandwidth, &(result->bw_med));
+		/* timeval - timeval */
+		difftimeval ( &(probe->start), &(probe->end), &(result->time_med));
+		result->jitter_med = result->jitter_med/(probe->received_packets - 1);
+
+		memset (buffer, 0, 256);
+		if (!get_currentDateTime (buffer, 256)) {
+			LOG_FILE (((log_file != NULL) ? log_file : DEFAULT_RECVCONT_BURST_LOGFILE), "[%s]\t%4d\t%4d\t%5d\t%10d\t%12.4f\t%09.6f\n",
+					buffer, conf_settings->recvsock_buffer, probe->received_total/probe->received_packets, probe->received_packets, probe->received_total, bandwidth/1000000, diff);
+		}
+		else {
+			LOG_FILE (((log_file != NULL) ? log_file : DEFAULT_RECVCONT_BURST_LOGFILE), "%4d\t%4d\t%5d\t%10d\t%12.4f\t%09.6f\n",
+					conf_settings->recvsock_buffer, probe->received_total/probe->received_packets, probe->received_packets, probe->received_total, bandwidth/1000000, diff);
+		}
+	}
+	return;
 }
 
 int resize_socket_buffer (int size) {

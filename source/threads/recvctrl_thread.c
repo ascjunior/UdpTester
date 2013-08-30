@@ -44,14 +44,13 @@ void *recvctrl_thread (void *param) {
 	char buffer[BUFFER_SIZE+1];
 	int yes = 1;
 
-	DEBUG_LEVEL_MSG (DEBUG_LEVEL_LOW, "***Starting recv ctrl thread...\n");
     if ((sockfd = socket (AF_INET, SOCK_STREAM, 0)) == -1) {
-		DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "Could not create socket\n");
+		DEBUG_LEVEL_MSG (DEBUG_LEVEL_LOW, "Could not create socket\n");
         exit(1);
     }
 
 	if (setsockopt (sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
-		DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "Could not set socket\n");
+		DEBUG_LEVEL_MSG (DEBUG_LEVEL_LOW, "Could not set socket\n");
 		exit(1);
 	}
 
@@ -65,12 +64,12 @@ void *recvctrl_thread (void *param) {
 	server.sin_addr.s_addr = INADDR_ANY;
 	
 	if ((bind (sockfd, (struct sockaddr *)&server, sizeof(struct sockaddr ))) == -1) { 
-		DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "Could not bind\n");
+		DEBUG_LEVEL_MSG (DEBUG_LEVEL_LOW, "Could not bind\n");
 		exit(1);
 	}
 
 	if ((listen (sockfd, BACKLOG)) == -1) {
-		DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "Could not listen\n");
+		DEBUG_LEVEL_MSG (DEBUG_LEVEL_LOW, "Could not listen\n");
 		exit(1);
 	}
 
@@ -78,7 +77,7 @@ void *recvctrl_thread (void *param) {
 		size = sizeof(struct sockaddr_in);  
 
 		if ((client_fd = accept(sockfd, (struct sockaddr *)&dest, &size))==-1) {
-			DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "Could not accept\n");
+			DEBUG_LEVEL_MSG (DEBUG_LEVEL_LOW, "Could not accept\n");
 			exit(1);
 		}
 
@@ -96,11 +95,11 @@ void *recvctrl_thread (void *param) {
 		
 		while (1) {
 			if ((num = recv (client_fd, buffer, BUFFER_SIZE,0)) == -1) {
-				DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "Error in receiving message\n");
+				DEBUG_LEVEL_MSG (DEBUG_LEVEL_LOW, "Error in receiving message\n");
 				exit(1);
 			}   
 			else if (num == 0) {
-				DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "Connection closed\n");
+				DEBUG_LEVEL_MSG (DEBUG_LEVEL_LOW, "Connection closed\n");
 				break;
 			}
 
@@ -137,19 +136,18 @@ void *recvctrlUDP_thread (void *param) {
 	char buffer[BUFFER_SIZE+1];
 	int yes = 1, resize_buffer = DEFAULT_SOC_BUFFER;
 
-	DEBUG_LEVEL_MSG (DEBUG_LEVEL_LOW, "Starting recv ctrl thread...\n");
     if ((sockfd = socket (AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
-		DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "Could not create socket\n");
+		DEBUG_LEVEL_MSG (DEBUG_LEVEL_LOW, "Could not create socket\n");
         exit(1);
     }
 
 	if (setsockopt (sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
-		DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "Could not set socket\n");
+		DEBUG_LEVEL_MSG (DEBUG_LEVEL_LOW, "Could not set socket\n");
 		exit(1);
 	}
 
 	if (setsockopt(sockfd, SOL_SOCKET, SO_RCVBUF, (const void *)&resize_buffer, sizeof(resize_buffer)) != 0) {
-		fprintf(stderr, "Could not resize receive socket buffers!!\n");
+		DEBUG_LEVEL_MSG (DEBUG_LEVEL_LOW, "Could not resize receive socket buffers!!\n");
 		exit(1);
 	}
 
@@ -163,17 +161,17 @@ void *recvctrlUDP_thread (void *param) {
 	server.sin_addr.s_addr = INADDR_ANY;
 	
 	if ((bind (sockfd, (struct sockaddr *)&server, sizeof(struct sockaddr))) == -1) { 
-		DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "Could not bind\n");
+		DEBUG_LEVEL_MSG (DEBUG_LEVEL_LOW, "Could not bind\n");
 		exit(1);
 	}
 
 	while (1) {
 		if ((num = recvfrom(sockfd, buffer, BUFFER_SIZE, 0, sock_dest, &size)) == -1) {
-			DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "Error in receiving message\n");
+			DEBUG_LEVEL_MSG (DEBUG_LEVEL_LOW, "Error in receiving message\n");
 			exit(1);
 		}   
 		else if (num == 0) {
-			DEBUG_LEVEL_MSG (DEBUG_LEVEL_HIGH, "Connection closed\n");
+			DEBUG_LEVEL_MSG (DEBUG_LEVEL_LOW, "Connection closed\n");
 			break;
 		}
 		buffer[num] = '\0';
